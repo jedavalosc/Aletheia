@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block main %}
+<h1>Termos carregados</h1><p class="muted">Revisar a cada ciclo eleitoral. Encerrar a vigência mantém o histórico.</p>
+<form method="post" action="/admin/termos"><input type="hidden" name="csrf" value="{{ csrf }}">
+<select name="idioma"><option>pt</option><option>es</option><option>en</option></select>
+<input name="termino" placeholder="Termo" required> <input name="patron" placeholder="Padrão (regex)" required>
+<select name="permitido_si"><option value="atribuido_o_cita">só atribuído ou em citação</option><option value="cita">só em citação</option></select>
+<input name="alternativa" placeholder="Alternativa neutra"> <input name="nota" placeholder="Nota"> <button>Adicionar</button></form>
+<table><thead><tr><th>Língua</th><th>Termo</th><th>Padrão</th><th>Regra</th><th>Alternativa</th><th>Vigência</th><th></th></tr></thead><tbody>
+{% for t in rows %}<tr><td>{{ t.idioma }}</td><td>{{ t.termino }}</td><td><code>{{ t.patron }}</code></td><td>{{ t.permitido_si }}</td><td>{{ t.alternativa or '' }}</td><td>{{ t.vigente_desde }} – {{ t.vigente_hasta or '' }}</td>
+<td>{% if not t.vigente_hasta %}<form class="inline" method="post" action="/admin/termos/{{ t.id }}/encerrar"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Encerrar</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

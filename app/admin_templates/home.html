@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block main %}
+<h1>Edições</h1>
+<p class="muted">Nada é publicado sem aprovação de um editor com nome. A edição só pode ser aprovada quando todos os bloqueios abaixo estiverem resolvidos.</p>
+<table><thead><tr><th>N.º</th><th>Estado</th><th>Corte</th><th>Eventos</th><th>Bloqueios</th></tr></thead><tbody>
+{% for r in rows %}<tr><td><a href="/admin/edicao/{{ r.ed.id }}">{{ r.ed.numero }}</a>{% if r.ed.es_demo %} <span class="pill">demonstração</span>{% endif %}</td>
+<td>{{ r.ed.estado }}{% if r.ed.aprobada_por %} · {{ r.ed.aprobada_por }}{% endif %}</td><td>{{ r.ed.corte_ingesta }}</td><td>{{ r.ed.events|length }}</td>
+<td>{% for g in r.gates %}<div class="bad">{{ g }}</div>{% else %}<span class="ok">nenhum</span>{% endfor %}</td></tr>{% endfor %}
+</tbody></table>
+<p>Entradas pendentes: {{ n_disputes }} contestações, {{ n_sugs }} sugestões vindas do chat. <a href="/admin/entradas">Ver</a></p>
+{% endblock %}

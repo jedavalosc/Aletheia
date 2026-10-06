@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ t('edition_n', lang, n=ed.numero) }} · {{ t('site_name', lang) }}{% endblock %}
+{% block version %}{{ t('version', lang) }} 1{% endblock %}
+{% block main %}
+<div class="ed-head">
+  <span><b>{{ t('edition_n', lang, n=ed.numero) }}</b></span>
+  <span>{{ t('week', lang) }}: {{ ed.semana }}</span>
+  <span>{{ t('cutoff', lang) }}: {{ ed.corte }}</span>
+</div>
+<p class="small muted ui">{{ t('cutoff_note', lang, d=ed.corte_dia) }}</p>
+<div class="controls"><button type="button" class="toggle" data-factual-toggle aria-pressed="false">{{ t('factual_mode', lang) }}</button></div>
+<h1 class="smallcaps" style="font-size:1rem;margin-top:24px">{{ t('events_by_impact', lang) }}</h1>
+<p class="small muted ui" style="margin-top:-8px">{{ t('impact_note', lang) }}</p>
+<ol class="events">
+{% for e in events %}
+  <li>
+    <span class="sec {{ e.seccion }}">{{ e.seccion_label }}</span>{% if e.excepcional %} <span class="badge">{{ t('exceptional', lang) }}</span>{% endif %}
+    <h2><a href="{{ e.url }}">{{ e.titulo }}</a></h2>
+    <div class="minicov coverage-block" aria-label="{{ t('coverage', lang) }}">
+    {% for r in e.cover_bars %}
+      <span>{{ r.label }}</span>
+      <span><span class="minibar" style="display:block" aria-hidden="true"><i class="p{{ r.slot }}" style="width:{{ (r.pct*100)|round(1) }}%"></i></span>{{ r.text }}</span>
+    {% endfor %}
+    </div>
+  </li>
+{% endfor %}
+</ol>
+{% if archive|length > 1 %}<h2>{{ t('archive', lang) }}</h2><p class="ui small">{% for n in archive[1:] %}{{ t('edition_n', lang, n=n) }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% endblock %}

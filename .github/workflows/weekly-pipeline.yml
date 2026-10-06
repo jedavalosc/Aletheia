@@ -1,0 +1,32 @@
+# Weekly pipeline (free on GitHub Actions). Runs Saturday 06:00 UTC = 03:00 BRT,
+# inside the production window (Saturday 00:00 to Monday 06:00 BRT).
+# Needs the repository secret DATABASE_URL (same Neon string as on Render):
+# Settings → Secrets and variables → Actions → New repository secret.
+name: weekly-pipeline
+on:
+  schedule:
+    - cron: "0 6 * * 6"
+  workflow_dispatch:
+    inputs:
+      forcar:
+        description: "Run outside the production window"
+        type: boolean
+        default: false
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Migrate and run pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          COUNTRY: BR
+        run: |
+          alembic upgrade head
+          if [ "${{ inputs.forcar }}" = "true" ]; then python -m app.pipeline.weekly --forcar; else python -m app.pipeline.weekly; fi

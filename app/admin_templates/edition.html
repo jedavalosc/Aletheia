@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block main %}
+<h1>Edição n.º {{ ed.numero }} <span class="pill">{{ ed.estado }}</span></h1>
+<p class="muted">Semana {{ ed.semana_inicio }} – {{ ed.semana_fin }} · corte {{ ed.corte_ingesta }}</p>
+{% if gates %}<div class="msg"><b>Bloqueios para publicar:</b><ul>{% for g in gates %}<li>{{ g }}</li>{% endfor %}</ul></div>{% endif %}
+{% for e in events %}{% set ev = e.ev %}{% set b = e.brief %}
+<section><h2>{{ ev.titulo_provisional }} <span class="pill">{{ ev.seccion }}</span> <span class="pill">impacto {{ ev.impacto }}</span>{% if ev.sensible %} <span class="pill">sensível</span>{% endif %}</h2>
+{% if ev.tema_excepcional %}<p><b>Inclusão excepcional.</b> Razão registrada: {{ ev.razon_inclusion }}<br>
+{% if ev.razon_inclusion_confirmada_por %}<span class="ok">Confirmada por {{ ev.razon_inclusion_confirmada_por }}</span>{% else %}
+<form class="inline" method="post" action="/admin/evento/{{ ev.id }}/confirmar-inclusao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ed_id" value="{{ ed.id }}"><input name="nome" placeholder="Nome do editor" required><button>Confirmar razão de inclusão</button></form>{% endif %}</p>{% endif %}
+{% if b %}<h3>Crônica v{{ b.version }} — estado: {{ b.estado }}</h3>
+<ol>{% for st in b.sentences %}<li>{{ st.texto }} <span class="muted">[{{ st.claim_ids|join(', ') }}]</span></li>{% endfor %}</ol>
+<table><thead><tr><th>Língua</th><th>Verificação</th></tr></thead><tbody>{% for lang, r in (b.verificacion or {}).items() %}<tr><td>{{ lang }}</td><td>{% if r.ok %}<span class="ok">ok</span>{% else %}{% for i in r.issues %}<div class="bad">[{{ i.orden }}] {{ i.detalle }}</div>{% endfor %}{% endif %}</td></tr>{% endfor %}</tbody></table>
+<form class="inline" method="post" action="/admin/cronica/{{ b.id }}/verificar"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Refazer verificação</button></form>
+{% if b.estado != 'aprobada' %}<form class="inline" method="post" action="/admin/cronica/{{ b.id }}/aprovar"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="nome" placeholder="Nome do editor" required><input name="comentarios" placeholder="Comentários"><button>Aprovar crônica</button></form>
+<form class="inline" method="post" action="/admin/cronica/{{ b.id }}/rejeitar"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="nome" placeholder="Nome do editor" required><input name="comentarios" placeholder="Motivo" required><button>Devolver</button></form>{% endif %}
+{% endif %}
+<h3>Afirmações</h3><table><thead><tr><th>Código</th><th>Texto</th><th>Modo</th><th>Apoios</th></tr></thead><tbody>
+{% for c in e.claims %}<tr><td>{{ c.codigo }}</td><td>{{ c.texto_normalizado }}</td><td>{{ c.modo }}</td><td>{{ c.supports|length }}</td></tr>{% endfor %}</tbody></table>
+<h3>Bandeiras de ponto cego</h3>{% for f, p in e.flags %}<form class="inline" method="post" action="/admin/bandeira/{{ f.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ed_id" value="{{ ed.id }}">{{ f.subject }} · cobertura baixa em {{ p.etiqueta }} · diferença {{ (f.diferencia_cobertura*100)|round }} p.p. · <select name="estado">{% for s in ['provisional','confirmada','descartada'] %}<option{% if s == f.estado %} selected{% endif %}>{{ s }}</option>{% endfor %}</select><button>Salvar</button></form><br>{% else %}<p class="muted">Nenhuma.</p>{% endfor %}
+<h3>Peças visuais</h3><ul>{% for v in e.visuals %}<li>{{ v.tipo }} · nível {{ v.nivel }} · {{ v.estado }}</li>{% endfor %}</ul>
+<h3>Traduções</h3><details><summary>{{ e.translations|length }} orações traduzidas</summary>
+{% for x in e.translations %}<form method="post" action="/admin/traducao/{{ x.tr.id }}/revisada" style="margin:8px 0"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ed_id" value="{{ ed.id }}">
+<div class="muted">{{ x.tr.idioma }} · {{ x.tr.metodo }}{% if x.tr.revisor %} · {{ x.tr.revisor }}{% endif %} · original: {{ x.orig }}</div>
+<textarea name="texto" rows="2">{{ x.tr.texto }}</textarea><input name="nome" placeholder="Nome do revisor" required> <button>Marcar como revisada</button></form>{% endfor %}</details>
+<h3>Artigos (fusão e divisão de eventos)</h3><details><summary>{{ e.articles|length }} artigos</summary><table>{% for a, o in e.articles %}<tr><td>{{ o.nombre }}</td><td>{{ a.titular }}</td><td>
+<form class="inline" method="post" action="/admin/artigo/reatribuir"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ed_id" value="{{ ed.id }}"><input type="hidden" name="article_id" value="{{ a.id }}"><input type="hidden" name="from_event" value="{{ ev.id }}">
+<select name="to_event">{% for x in all_events if x.id != ev.id %}<option value="{{ x.id }}">{{ x.slug }}</option>{% endfor %}</select><button>Mover</button></form></td></tr>{% endfor %}</table></details>
+</section>{% endfor %}
+{% if ed.estado != 'publicada' %}<section><h2>Publicar</h2>
+<form class="inline" method="post" action="/admin/edicao/{{ ed.id }}/aprovar"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="nome" placeholder="Nome do editor responsável" required><button>Aprovar e publicar a edição</button></form></section>{% endif %}
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ t('dispute_long', lang) }} · {{ t('site_name', lang) }}{% endblock %}
+{% block version %}{{ t('version', lang) }} 1{% endblock %}
+{% set L = {
+ 'pt': {'intro': 'Qualquer leitor ou veículo pode contestar uma oração, uma afirmação, uma peça visual, um enunciado acadêmico ou a posição estimada de um veículo. Traga a evidência. Correções geram uma nova versão, visível no histórico.',
+        'what': 'O que você contesta', 'ref': 'Referência (claim_id, endereço do evento ou nome do veículo)', 'text': 'O que está errado', 'ev': 'Evidência (links, documentos)',
+        'contact': 'Contato (opcional, só se quiser resposta)', 'send': 'Enviar contestação',
+        'priv': 'Guardamos apenas o que você escrever aqui. O contato é opcional e é usado só para responder a esta contestação.',
+        'ok': 'Contestação recebida. Obrigado.', 'err': 'Não foi possível enviar agora.',
+        'opts': [('brief_sentence','Oração da crônica'),('claim','Afirmação'),('visual','Peça visual'),('commentary_statement','Enunciado acadêmico'),('outlet_position','Posição de um veículo'),('theme','Elemento visual do site')]},
+ 'es': {'intro': 'Cualquier lector o medio puede disputar una oración, una afirmación, una pieza visual, un enunciado académico o la posición estimada de un medio. Aporte la evidencia. Las correcciones generan una nueva versión, visible en el historial.',
+        'what': 'Qué disputa', 'ref': 'Referencia (claim_id, dirección del evento o nombre del medio)', 'text': 'Qué está mal', 'ev': 'Evidencia (enlaces, documentos)',
+        'contact': 'Contacto (opcional, solo si quiere respuesta)', 'send': 'Enviar disputa',
+        'priv': 'Guardamos solo lo que escriba aquí. El contacto es opcional y se usa solo para responder a esta disputa.',
+        'ok': 'Disputa recibida. Gracias.', 'err': 'No fue posible enviarla ahora.',
+        'opts': [('brief_sentence','Oración de la crónica'),('claim','Afirmación'),('visual','Pieza visual'),('commentary_statement','Enunciado académico'),('outlet_position','Posición de un medio'),('theme','Elemento visual del sitio')]},
+ 'en': {'intro': 'Any reader or outlet can dispute a sentence, a claim, a visual piece, an academic statement or an outlet\'s estimated position. Bring the evidence. Corrections create a new version, visible in the history.',
+        'what': 'What you are disputing', 'ref': 'Reference (claim_id, event address or outlet name)', 'text': 'What is wrong', 'ev': 'Evidence (links, documents)',
+        'contact': 'Contact (optional, only if you want a reply)', 'send': 'Send dispute',
+        'priv': 'We keep only what you write here. Contact is optional and used only to reply to this dispute.',
+        'ok': 'Dispute received. Thank you.', 'err': 'It could not be sent right now.',
+        'opts': [('brief_sentence','Chronicle sentence'),('claim','Claim'),('visual','Visual piece'),('commentary_statement','Academic statement'),('outlet_position','Outlet position'),('theme','Site visual element')]}}[lang] %}
+{% block main %}
+<div class="col">
+<h1>{{ t('dispute_long', lang) }}</h1>
+<p>{{ L.intro }}</p>
+<form class="dispute" method="post" action="/api/disputa" id="dispute-form">
+  <input type="hidden" name="idioma" value="{{ lang }}">
+  <label for="d-what">{{ L.what }}</label>
+  <select id="d-what" name="target_tipo">{% for v, lbl in L.opts %}<option value="{{ v }}">{{ lbl }}</option>{% endfor %}</select>
+  <label for="d-ref">{{ L.ref }}</label><input id="d-ref" name="target_ref" required maxlength="80">
+  <label for="d-text">{{ L.text }}</label><textarea id="d-text" name="texto" rows="5" required maxlength="4000"></textarea>
+  <label for="d-ev">{{ L.ev }}</label><textarea id="d-ev" name="evidencia" rows="3" maxlength="4000"></textarea>
+  <label for="d-contact">{{ L.contact }}</label><input id="d-contact" name="contacto" maxlength="200" autocomplete="email">
+  <p class="ui small muted">{{ L.priv }}</p>
+  <button type="submit">{{ L.send }}</button>
+  <p class="ui" id="d-status" role="status" aria-live="polite"></p>
+</form>
+</div>
+<script>
+(function(){var f=document.getElementById("dispute-form"),st=document.getElementById("d-status");
+var q=new URLSearchParams(location.search).get("ref");if(q)document.getElementById("d-ref").value=q;
+f.addEventListener("submit",function(e){e.preventDefault();var d={};new FormData(f).forEach(function(v,k){d[k]=v;});
+fetch("/api/disputa",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)})
+.then(function(r){if(!r.ok)throw 0;st.textContent={{ L.ok|tojson }};f.reset();}).catch(function(){st.textContent={{ L.err|tojson }};});});})();
+</script>
+{% endblock %}

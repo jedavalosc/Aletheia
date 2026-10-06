@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block main %}
+<h1>Contestações</h1><table><thead><tr><th>Alvo</th><th>Texto</th><th>Evidência</th><th>Contato</th><th>Estado</th></tr></thead><tbody>
+{% for d in disputes %}<tr><td>{{ d.target_tipo }} · {{ d.target_ref }}</td><td>{{ d.texto }}</td><td>{{ d.evidencia }}</td><td>{{ d.contacto or '' }}</td><td>
+<form class="inline" method="post" action="/admin/entradas/disputa/{{ d.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><select name="estado">{% for s in ['recibida','en_analisis','aceptada','rechazada'] %}<option{% if s == d.estado %} selected{% endif %}>{{ s }}</option>{% endfor %}</select><input name="resolucion" placeholder="Resolução" value="{{ d.resolucion or '' }}"><button>Salvar</button></form></td></tr>{% else %}<tr><td colspan="5" class="muted">Nenhuma.</td></tr>{% endfor %}</tbody></table>
+<h1>Sugestões do chat para a extração</h1><p class="muted">Dados que leitores trouxeram e que não estão na edição. Sem vínculo com a conversa nem dados pessoais.</p>
+<table><tbody>{% for x in sugs %}<tr><td>{{ x.texto }}</td><td>{{ x.creado_en }}</td><td><form class="inline" method="post" action="/admin/entradas/sugestao/{{ x.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><select name="estado">{% for s in ['pendiente','enviada_extraccion','descartada'] %}<option{% if s == x.estado %} selected{% endif %}>{{ s }}</option>{% endfor %}</select><button>Salvar</button></form></td></tr>{% else %}<tr><td class="muted">Nenhuma.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

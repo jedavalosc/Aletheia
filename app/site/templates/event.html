@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ ev.titulo }} · {{ t('site_name', lang) }}{% endblock %}
+{% block description %}{{ ev.paras[0].sentences[0].texto }}{% endblock %}
+{% block version %}{{ t('version', lang) }} {{ ev.version }} · <a href="#historico">{{ t('version_history', lang) }}</a>{% endblock %}
+{% block event_slug %}{{ ev.slug|tojson }}{% endblock %}
+{% macro side(col) %}
+  <h2>{{ col.pole }}</h2>
+  {% for h in col.heads %}
+  <div class="hl"><q>{{ h.html }}</q><span class="src">{{ h.outlet }} · <a href="{{ h.url }}" rel="nofollow noopener">{{ t('open_original', lang) }}</a></span></div>
+  {% endfor %}
+  {% if lang != 'pt' %}<p class="small muted">{{ t('original_pt', lang) }}.</p>{% endif %}
+  <div class="omit"><h3>{{ t('not_mention', lang) }}</h3>
+  {% if col.omitted %}<ul>{% for o in col.omitted %}<li>{{ o }}</li>{% endfor %}</ul>{% else %}<p class="small" style="margin:0">{{ t('not_mention_none', lang) }}</p>{% endif %}
+  </div>
+{% endmacro %}
+{% block main %}
+<p class="ui small"><a href="/{{ lang }}/index.html">← {{ t('back', lang) }}</a></p>
+<span class="sec {{ ev.seccion }}">{{ ev.seccion_label }}</span>
+{% if ev.excepcional %}<p class="ui small"><span class="badge">{{ t('exceptional', lang) }}</span> {{ ev.excepcional }}</p>{% endif %}
+<h1 class="col">{{ ev.titulo }}</h1>
+<p class="ui small muted">{{ t('version_line', lang, v=ev.version, d=ed.publicada) }} · {{ t('cutoff', lang) }}: {{ ed.corte }}</p>
+{% if ev.tr_note %}<p class="mt-warn" role="note">{{ ev.tr_note }}</p>{% endif %}
+
+<div class="controls">
+  <button type="button" class="toggle" data-factual-toggle aria-pressed="false">{{ t('factual_mode', lang) }}</button>
+  <span class="axis-ctl">{{ t('axis_switch', lang) }}:
+    <span class="seg" role="group" aria-label="{{ t('axis', lang) }}">{% for a in ev.axes %}<button type="button" data-axis-btn="{{ a.id }}" aria-pressed="{{ 'true' if a.principal else 'false' }}">{{ a.label }}</button>{% endfor %}</span>
+  </span>
+</div>
+<p class="factual-links">{{ t('factual_on', lang) }} <a href="#cobertura" data-leave-factual>{{ t('see_coverage', lang) }}</a>{% if ev.academic %} · <a href="#academica" data-leave-factual>{{ t('see_academic', lang) }}</a>{% endif %}</p>
+
+<div class="tabs" role="tablist" aria-label="{{ t('how_covered', lang) }}">
+  <button role="tab" type="button" data-pane="l" aria-selected="false">{% for a in ev.axes %}<span data-axis-view="{{ a.id }}"{% if not a.principal %} hidden{% endif %}>{{ a.cols[0].pole }}</span>{% endfor %}</button>
+  <button role="tab" type="button" data-pane="c" aria-selected="true">{{ t('chronicle', lang) }}</button>
+  <button role="tab" type="button" data-pane="r" aria-selected="false">{% for a in ev.axes %}<span data-axis-view="{{ a.id }}"{% if not a.principal %} hidden{% endif %}>{{ a.cols[1].pole }}</span>{% endfor %}</button>
+</div>
+<div class="tript">
+  <aside class="side" data-pane="l">{% for a in ev.axes %}<div class="pole-col {{ a.cols[0].slot }}" data-axis-view="{{ a.id }}"{% if not a.principal %} hidden{% endif %} aria-label="{{ a.cols[0].pole }}">{{ side(a.cols[0]) }}</div>{% endfor %}</aside>
+  <article class="chron active" data-pane="c" aria-label="{{ t('chronicle', lang) }}">
+  {% for p in ev.paras %}
+    <p>{% for sn in p.sentences %}<span class="sent" role="button" tabindex="0" aria-expanded="false" aria-controls="{{ p.id }}" data-claims="{{ sn.claim_ids|join(' ') }}" title="{{ t('show_sources', lang) }}">{{ sn.texto }}<span class="cnt" aria-hidden="true">{{ sn.claim_ids|length }}</span></span>{% if not loop.last %} {% endif %}{% endfor %}</p>
+    <details class="src" id="{{ p.id }}" open><summary>{{ t('sources_paragraph', lang) }}</summary>
+    {% for c in p.claims %}
+      <div class="claim" data-claim="{{ c.codigo }}" id="{{ c.codigo }}">
+        <p><span class="badge{% if c.modo == 'llano' %} fill{% endif %}" title="{{ c.modo_why }}">{{ c.modo_label }}</span> <b>{{ c.codigo }}</b> · {{ c.texto }}</p>
+        {% if c.primaria %}<p>{{ t('primary_source', lang) }}: {{ c.primaria }}</p>{% endif %}
+        <p class="muted">{{ t('supported_by', lang) }} ({{ c.supports|length }}):</p>
+        <ul>{% for sp in c.supports %}<li>{{ sp.outlet }} — {{ sp.stance }}: <span class="frag" lang="pt">“{{ sp.fragment }}”</span> <a href="{{ sp.url }}" rel="nofollow noopener">{{ t('open_original', lang) }}</a></li>{% endfor %}</ul>
+      </div>
+    {% endfor %}
+    </details>
+  {% endfor %}
+  </article>
+  <aside class="side" data-pane="r">{% for a in ev.axes %}<div class="pole-col {{ a.cols[1].slot }}" data-axis-view="{{ a.id }}"{% if not a.principal %} hidden{% endif %} aria-label="{{ a.cols[1].pole }}">{{ side(a.cols[1]) }}</div>{% endfor %}</aside>
+</div>
+<p class="ui small muted coverage-block">{{ t('loaded_legend', lang) }} {{ t('pole_order_note', lang) }}</p>
+
+<div class="col">
+{% for tb in ev.tables %}
+  <h2>{{ t('disputed_table', lang) }}: {{ tb.medida }}</h2>
+  <table class="disp"><thead><tr><th scope="col">{{ t('source', lang) }}</th><th scope="col">{{ t('figure', lang) }}</th><th scope="col">{{ t('claim', lang) }}</th></tr></thead>
+  <tbody>{% for r in tb.rows %}<tr><td>{{ r.fonte }}</td><td class="num">{{ r.valor }} {{ r.unidad }}</td><td><a href="#{{ r.codigo }}">{{ r.codigo }}</a></td></tr>{% endfor %}</tbody></table>
+  <p class="ui small muted">{{ t('figures_note', lang) }}</p>
+{% endfor %}
+
+<section class="coverage-block" id="cobertura" aria-labelledby="cov-h">
+  <h2 id="cov-h">{{ t('how_covered', lang) }}</h2>
+  {% for f in ev.figures %}
+  <figure{% if f.multi %} data-variants{% endif %}>
+    {% if f.multi %}<div class="controls" style="margin:0 0 8px"><span class="seg" role="group" aria-label="{{ t('coverage', lang) }}">
+      <button type="button" data-measure-btn="medios" aria-pressed="true">{{ t('by_outlets', lang) }}</button><button type="button" data-measure-btn="audiencia" aria-pressed="false">{{ t('by_audience', lang) }}</button></span></div>{% endif %}
+    {% for v in f.variants %}<div class="variant" data-axis="{{ v.axis }}" data-measure="{{ v.measure }}"{% if not v.default %} hidden{% endif %}>{{ v.svg }}</div>{% endfor %}
+  </figure>
+  {% endfor %}
+</section>
+
+{% if ev.academic %}{% set ac = ev.academic %}
+<section class="academic" id="academica" aria-labelledby="ac-h">
+  <h2 id="ac-h" class="label">{{ t('academic_label', lang) }}</h2>
+  <p class="tradition"><b>{{ t('tradition', lang) }}:</b> {{ ac.tradition }} · {{ t('commentator', lang) }}: {{ ac.scholar }}, {{ ac.affiliation }}{% if ac.reviewer %} · {{ t('peer_reviewer', lang) }}: {{ ac.reviewer }}{% endif %}</p>
+  <details>
+    <summary>{{ t('academic_label', lang).split('.')[0] }}</summary>
+    <p class="ui small">{{ t('disclosure', lang) }}: {{ ac.disclosures|join('; ') }}</p>
+    <div class="scales" aria-label="{{ t('series', lang) }}">{% for sc in ac.scales %}<div><b>{{ sc.label }}</b><br>{{ sc['items']|join(', ') or '—' }}</div>{% endfor %}</div>
+    {% for d in ac.by_discipline %}
+      <h3>{{ d.name }}</h3>
+      {% for st in d['items'] %}
+      <div class="stmt">
+        <div class="badges"><span class="badge">{{ st.plano }}</span><span class="badge st-{{ st.estatus }}">{{ st.estatus_label }}</span><span class="badge">{{ st.escala }}</span></div>
+        <p style="margin:0">{{ st.texto }}{% if st.demo %} <span class="ui small muted">({{ t('demo_text_note', lang) }})</span>{% endif %}</p>
+        {% if st.claims %}<p class="ui small" style="margin:2px 0">{% for c in st.claims %}<a href="#{{ c }}">{{ c }}</a> {% endfor %}</p>{% endif %}
+        <p class="ui small muted" style="margin:2px 0">{% for r in st.refs %}{{ r.cita }} [{{ t('role_' ~ r.rol, lang) }}{% if r.ficticia %}; {{ t('fictional_ref', lang) }}{% endif %}]{% if not loop.last %} · {% endif %}{% endfor %}</p>
+      </div>
+      {% endfor %}
+    {% endfor %}
+    {% if not ac.has_explanatory %}<p class="reserved">{{ t('reserved_plane', lang) }}</p>{% endif %}
+    <h3>{{ t('disciplines', lang) }}</h3>
+    <ul class="ui small">{% for d in ac.discipline_map %}<li><b>{{ d.name }}</b>: {{ d.q }}</li>{% endfor %}</ul>
+    {% for g in ac.gaps %}<p class="gapnote">{{ t('no_commentator_from', lang, d=g.name) }}. {{ g.why }}</p>{% endfor %}
+  </details>
+  <div class="dont">
+    <h3>{{ t('what_we_dont_know', lang) }}</h3>
+    <table class="disp"><thead><tr><th scope="col">{{ t('what_we_dont_know', lang) }}</th><th scope="col">{{ t('why_unknown', lang) }}</th></tr></thead>
+    <tbody>{% for q in ac.dont_know %}<tr><td>{{ q.q }}</td><td>{{ q.reason }}. {{ q.why }}</td></tr>{% endfor %}</tbody></table>
+  </div>
+</section>
+{% endif %}
+
+<section id="historico" aria-labelledby="hist-h">
+  <h2 id="hist-h">{{ t('version_history', lang) }}</h2>
+  <ul class="ui small"><li>{{ t('version_line', lang, v=ev.version, d=ed.publicada) }} — {{ t('cutoff', lang) }}: {{ ed.corte }}{% if ed.aprobada_por %} · {{ t('approved_by', lang) }}: {{ ed.aprobada_por }}{% endif %}</li></ul>
+  <p class="ui small"><a href="/{{ lang }}/contestar.html?ref={{ ev.slug }}">{{ t('dispute_long', lang) }}</a></p>
+</section>
+</div>
+{% endblock %}

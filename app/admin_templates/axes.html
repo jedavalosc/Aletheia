@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block main %}
+<h1>Eixos (hipóteses versionadas)</h1>
+{% for a in rows %}<form method="post" action="/admin/eixos/{{ a.id }}" style="margin:12px 0"><input type="hidden" name="csrf" value="{{ csrf }}">
+<b>{{ a.nombre }}</b> ({{ a.tipo }}) · polos: {% for p in a.poles %}{{ p.etiqueta }}{% if not loop.last %} / {% endif %}{% endfor %} · desde {{ a.vigente_desde }}<br>
+<label><input type="checkbox" name="activo" value="1"{% if a.activo %} checked{% endif %}> ativo</label>
+<label><input type="checkbox" name="es_hipotesis" value="1"{% if a.es_hipotesis %} checked{% endif %}> hipótese</label>
+<textarea name="descripcion" rows="2">{{ a.descripcion }}</textarea><button>Salvar</button></form>{% endfor %}
+<h2>Novo eixo</h2><form method="post" action="/admin/eixos/novo"><input type="hidden" name="csrf" value="{{ csrf }}">
+<input name="slug" placeholder="slug" required> <input name="nombre" placeholder="Nome" required> <select name="tipo"><option>secundario</option><option>territorial</option><option>candidato</option></select>
+<input name="polo_a" placeholder="Polo A" required> <input name="polo_b" placeholder="Polo B" required> <input name="descripcion" placeholder="Descrição"> <button>Criar (inativo)</button></form>
+<h1>Lista de exclusão visual</h1>
+<table><thead><tr><th>Elemento</th><th>Cores</th><th>Motivo</th><th>Estado</th></tr></thead><tbody>
+{% for x in excl %}<tr><td>{{ x.elemento }}</td><td>{{ x.colores|join(', ') }}</td><td>{{ x.motivo }}</td><td>{% if x.confirmado %}confirmado{% else %}<form class="inline" method="post" action="/admin/exclusoes/{{ x.id }}/confirmar"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Confirmar</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table>
+<form method="post" action="/admin/exclusoes"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="elemento" placeholder="Elemento" required> <input name="colores" placeholder="#hex, #hex"> <select name="motivo"><option>partidario</option><option>emblema</option><option>religioso</option><option>conflicto</option></select> <button>Adicionar</button></form>
+{% endblock %}

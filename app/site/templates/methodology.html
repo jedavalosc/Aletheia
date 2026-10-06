@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ t('methodology', lang) }} · {{ t('site_name', lang) }}{% endblock %}
+{% block version %}{{ t('version', lang) }} 1{% endblock %}
+{% set L = method[lang] %}
+{% block main %}
+<div class="col">
+<h1>{{ t('methodology', lang) }}</h1>
+<p>{{ L.intro }}</p>
+<h2>{{ L.sel_h }}</h2><p>{{ L.sel }}</p>
+<h2>{{ L.ver_h }}</h2><p>{{ L.ver }}</p>
+<h2>{{ L.pol_h }}</h2><p>{{ L.pol }}</p>
+<h2>{{ L.cov_h }}</h2><p>{{ L.cov }}</p>
+<h2>{{ L.gaps_h }}</h2>{% for g in mv.gaps %}<p class="gapnote">{{ g }}</p>{% endfor %}
+<h2>{{ L.axes_h }}</h2>
+<ul class="ui small">{% for a in mv.axes %}<li><b>{{ a.label }}</b> ({{ a.tipo }}{% if not a.activo %}, {{ t('inactive_axis', lang) }}{% endif %}{% if a.hipotesis %}, {{ L.hyp }}{% endif %}) — {{ a.poles|join(' / ') }}. <span class="muted">{{ a.desc }}</span></li>{% endfor %}</ul>
+<p class="ui small muted">{{ t('hypothesis_axis', lang) }}.</p>
+</div>
+<h2 id="indice">{{ L.idx_h }}</h2>
+<p class="ui small muted col">{{ L.idx_note }}</p>
+<div style="overflow-x:auto" tabindex="0" role="region" aria-labelledby="indice"><table class="idx">
+<thead><tr><th scope="col">{{ t('source', lang) }}</th>{% for a in mv.active_axes %}<th scope="col">{{ a }}</th>{% endfor %}<th scope="col">{{ t('method', lang) }}</th></tr></thead>
+<tbody>{% for o in mv.outlets %}<tr><td>{{ o.name }}{% if o.fict %} <span class="badge">{{ t('fictional', lang) }}</span>{% endif %}{% if o.official %} <span class="muted">· {{ t('official_source', lang) }}</span>{% endif %}<br><span class="muted">{{ o.tipo }} · {{ o.region }}</span></td>
+{% for p in o.pos %}<td class="num">{% if p %}{{ p.score }} {{ p.ic }}<br><span class="muted">{{ p.pole }}{% if p.provisional %} · {{ t('provisional', lang) }}{% endif %}</span>{% else %}<span class="muted">{{ L.not_est }}</span>{% endif %}</td>{% endfor %}
+<td class="muted">{% for p in o.pos if p %}{% if loop.first %}{{ p.method }}{% endif %}{% endfor %}</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="col">
+<h2>{{ L.order_h }}</h2>
+<ul class="ui small">{% for e in pole_order %}<li>{{ e.titulo }} — {{ L.order_r if e.flip else L.order_l }}</li>{% endfor %}</ul>
+<h2>{{ L.terms_h }}</h2>
+<ul class="ui small">{% for x in mv.terms %}<li><b>{{ x.t }}</b>{% if x.only_quote %} ({{ L.only_quote }}){% endif %}{% if x.alt %} → {{ x.alt }}{% endif %}{% if x.nota %} <span class="muted">{{ x.nota }}</span>{% endif %}</li>{% endfor %}</ul>
+<h2>{{ L.tr_h }}</h2><p>{{ L.tr }}</p>
+<h2>{{ L.chat_h }}</h2><p>{{ L.chat }} {{ t('chat_privacy', lang, d=retention) }}</p>
+<h2>{{ L.id_h }}</h2><p>{{ L.id }}</p>
+<ul class="ui small">{% for x in mv.exclusions %}<li>{{ x.e }} <span class="muted">({{ x.motivo }}; {{ L.conf if x.confirmado else L.pend }})</span></li>{% endfor %}</ul>
+<h2>{{ L.ctx_h }}</h2>
+<ul class="ui small">{% for c in mv.context %}<li>{{ c.texto }} <span class="muted">— {{ c.fuente }}, {{ c.fecha }}</span></li>{% endfor %}</ul>
+</div>
+{% endblock %}

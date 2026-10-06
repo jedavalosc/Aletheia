@@ -1,0 +1,39 @@
+# Render Blueprint for Aletheia News Brasil.
+# Dashboard: New → Blueprint → select this repository. Render asks for the
+# values marked sync: false (DATABASE_URL from Neon, CHAT_API_KEY, ADMIN_PASSWORD).
+services:
+  - type: web
+    name: aletheia-news-brasil
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free            # change to "starter" ($7/month) to avoid sleeping after 15 min idle
+    region: virginia      # Render has no South American region; Neon project goes in AWS us-east-1 next to it
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL       # Neon pooled connection string (…-pooler…/neondb?sslmode=require)
+        sync: false
+      - key: CHAT_API_KEY       # Kimi key
+        sync: false
+      - key: ADMIN_PASSWORD     # password for /admin (user "editor")
+        sync: false
+      - key: CHAT_PROVIDER
+        value: openai_compatible
+      - key: CHAT_BASE_URL
+        value: https://api.moonshot.ai/v1
+      - key: CHAT_MODEL
+        value: kimi-k3
+      - key: CHAT_MAX_TOKENS
+        value: "4000"
+      - key: COUNTRY
+        value: BR
+      - key: AUTO_SEED            # loads Brazil config + fictional demo on first start; set to "" later
+        value: demo
+      - key: ADMIN_USER
+        value: editor
+      - key: CHAT_RETENTION_DAYS
+        value: "30"
+      - key: CHAT_RATE_PER_IP_PER_HOUR
+        value: "30"
+      - key: CHAT_DAILY_BUDGET_CENTS
+        value: "2000"

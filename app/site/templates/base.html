@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="{{ {'pt':'pt-BR','es':'es','en':'en'}[lang] }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ t('site_name', lang) }}{% endblock %}</title>
+<meta name="description" content="{% block description %}{{ t('tagline', lang) }}{% endblock %}">
+{% for l in LANGS %}<link rel="alternate" hreflang="{{ {'pt':'pt-BR','es':'es','en':'en'}[l] }}" href="{{ base_url }}/{{ l }}/{{ path }}">
+{% endfor %}<link rel="alternate" hreflang="x-default" href="{{ base_url }}/pt/{{ path }}">
+<link rel="canonical" href="{{ base_url }}/{{ lang }}/{{ path }}">
+<link rel="preload" href="/static/fonts/source-serif-4-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/aletheia.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%235E5546'/%3E%3Ctext x='8' y='12' font-size='11' text-anchor='middle' fill='%23FBFAF7' font-family='Georgia'%3EA%3C/text%3E%3C/svg%3E">
+{% if ed is defined and ed.demo %}<meta name="robots" content="noindex">{% endif %}
+</head>
+<body>
+<a class="skip" href="#main">{{ t('skip', lang) }}</a>
+{% if ed is defined %}
+<div class="trust" role="navigation" aria-label="{{ t('methodology', lang) }}">
+  <div class="wrap">
+    <span><b>{{ t('edition_n', lang, n=ed.numero) }}</b></span>
+    <span>{{ t('cutoff', lang) }}: <b>{{ ed.corte }}</b></span>
+    <span>{% block version %}{{ t('version', lang) }} 1 · <a href="#historico">{{ t('version_history', lang) }}</a>{% endblock %}</span>
+    <a href="/{{ lang }}/metodologia.html">{{ t('methodology', lang) }}</a>
+    <a href="/{{ lang }}/contestar.html">{{ t('dispute_long', lang) }}</a>
+    <nav class="lang" aria-label="{{ t('language', lang) }}">{% for l in LANGS %}<a href="/{{ l }}/{{ path }}" hreflang="{{ l }}" lang="{{ l }}"{% if l == lang %} aria-current="true"{% endif %}>{{ l|upper }}</a>{% endfor %}</nav>
+  </div>
+</div>
+{% if ed.demo %}<div class="demo" role="note"><div class="wrap">{{ t('demo_banner', lang) }} <span>{{ t('demo_banner_long', lang) }}</span></div></div>{% endif %}
+{% endif %}
+<header class="masthead"><div class="wrap">
+  <a href="/{{ lang }}/index.html"><div class="name">Aletheia News <span class="smallcaps">Brasil</span></div></a>
+  <div class="tag">{{ t('tagline', lang) }}</div>
+</div></header>
+<main id="main" class="wrap">
+{% block main %}{% endblock %}
+</main>
+<footer class="site"><div class="wrap">
+{% if ed is defined %}
+  <p>{{ t('edition_n', lang, n=ed.numero) }} · {{ t('week', lang) }}: {{ ed.semana }} · {{ t('cutoff', lang) }}: {{ ed.corte }}. {{ t('cutoff_note', lang, d=ed.corte_dia) }}</p>
+  <p>{{ t('published', lang) }}: {{ ed.publicada }}{% if ed.aprobada_por %} · {{ t('approved_by', lang) }}: {{ ed.aprobada_por }}{% endif %}</p>
+{% endif %}
+  <p><a href="/{{ lang }}/metodologia.html">{{ t('methodology', lang) }}</a> · <a href="/{{ lang }}/metodologia.html#indice">{{ t('media_index', lang) }}</a> · <a href="/{{ lang }}/contestar.html">{{ t('dispute_long', lang) }}</a></p>
+</div></footer>
+{% if ed is defined %}
+<button class="chat-open" id="chat-open" type="button">{{ t('chat_open', lang) }}</button>
+<section class="chat" id="chat" hidden aria-labelledby="chat-h" role="dialog">
+  <header><h2 id="chat-h">{{ t('chat_title', lang) }}</h2><button type="button" data-close>{{ t('chat_close', lang) }}</button></header>
+  <div class="log" role="log" aria-live="polite">
+    <p class="intro">{{ t('chat_intro', lang) }} {{ t('cutoff', lang) }}: {{ ed.corte }}.</p>
+  </div>
+  <p class="privacy">{{ t('chat_privacy', lang, d=retention) }}</p>
+  <form><label class="skip" for="chat-q">{{ t('chat_placeholder', lang) }}</label>
+    <textarea id="chat-q" rows="2" maxlength="800" placeholder="{{ t('chat_placeholder', lang) }}"></textarea>
+    <button type="submit">{{ t('chat_send', lang) }}</button></form>
+</section>
+<script>window.ALETHEIA={lang:{{ lang|tojson }},edition:{{ ed.numero|tojson }},event:{% block event_slug %}null{% endblock %},claimsUrl:"/{{ lang }}/claims.json",
+verifying:{{ t('chat_verifying', lang)|tojson }},unavailable:{{ t('chat_unavailable', lang)|tojson }},
+segLabels:{fato:{{ t('seg_fato', lang)|tojson }},interpretacao:{{ t('seg_interpretacao', lang)|tojson }},metodologia:{{ t('seg_metodologia', lang)|tojson }},cobertura:{{ t('seg_cobertura', lang)|tojson }}}};</script>
+{% endif %}
+<script src="/static/aletheia.js" defer></script>
+</body>
+</html>
