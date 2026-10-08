@@ -25,6 +25,8 @@ services:
         value: kimi-k3
       - key: CHAT_MAX_TOKENS
         value: "4000"
+      - key: PUBLIC_BASE_URL      # custom domain; links for search engines and sharing use it
+        value: https://aletheia-news.org
       - key: COUNTRY
         value: BR
       - key: AUTO_SEED            # loads Brazil config + fictional demo on first start; set to "" later
