@@ -158,6 +158,7 @@ Diseño en [`docs/agentes.md`](docs/agentes.md): los agentes proponen, el códig
 |---|---|---|
 | 1. Recolección (RSS y sitemaps de noticias, 20 medios) | `python -m app.cli collect` | Cada dos horas, `.github/workflows/collect.yml` |
 | 2. Agrupación en eventos candidatos | `python -m app.cli cluster [--semana AAAA-MM-DD] [--sem-modelo]` | Sábado 03:00 BRT, dentro del pipeline semanal |
+| 3. Afirmaciones con verificación cruzada | `python -m app.cli extract [--semana AAAA-MM-DD] [--max-eventos 15] [--refazer]` | Sábado, después de la agrupación |
 
 En el panel: **Fila de exceções** (lo que las reglas no resuelven), **Eventos da semana** (confirmar, fusionar, retirar artículos, marcar fuera de alcance) y **Corridas dos agentes** (cada paso con modelo, versión de prompt, tokens y costo).
 
@@ -165,8 +166,7 @@ En el panel: **Fila de exceções** (lo que las reglas no resuelven), **Eventos 
 
 ## Siguientes pasos
 
-1. Paso 3: extracción de afirmaciones con verificación cruzada en un segundo proveedor.
-2. Paso 4: redacción restringida con el verificador existente.
-3. Paso 5: posición de medios por dos agentes anotadores, con muestra de control del editor.
-4. Página pública "Como esta edição foi feita".
-5. Calibrar umbrales con cuatro semanas de datos reales.
+1. Paso 4: redacción restringida con el verificador existente.
+2. Paso 5: posición de medios por dos agentes anotadores, con muestra de control del editor.
+3. Página pública "Como esta edição foi feita".
+4. Calibrar umbrales con cuatro semanas de datos reales.

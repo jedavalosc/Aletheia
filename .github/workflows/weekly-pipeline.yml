@@ -33,6 +33,10 @@ jobs:
           CHAT_MODEL: kimi-k3
           CHAT_API_KEY: ${{ secrets.CHAT_API_KEY }}
           AGENT_BUDGET_CENTS_PER_RUN: "100"
+          # Claim checker: a different model (D36). Reasoning mode off for both (D40).
+          VERIFIER_MODEL: kimi-k2.6
+          AGENT_THINKING: disabled
+          VERIFIER_THINKING: disabled
         run: |
           alembic upgrade head
           if [ "${{ inputs.forcar }}" = "true" ]; then python -m app.pipeline.weekly --forcar; else python -m app.pipeline.weekly; fi

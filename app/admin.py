@@ -340,21 +340,48 @@ def queue(request: Request, estado: str = "pendiente", user: str = Depends(edito
                           .order_by(m.ReviewItem.prioridad, m.ReviewItem.id.desc()).limit(300)).all()
         events = {int(i.target_id): s.get(m.Event, int(i.target_id)) for i in items
                   if i.target_tipo == "event" and i.target_id.isdigit()}
-        return page("queue.html", user, items=items, events=events, estado=estado, msg=request.query_params.get("msg"))
+        claims = {}
+        for i in items:
+            if i.target_tipo == "claim" and i.target_id.isdigit():
+                c = s.get(m.Claim, int(i.target_id))
+                if c is not None:
+                    claims[int(i.target_id)] = {"c": c, "ev": s.get(m.Event, c.event_id),
+                                                "sups": [(sp, s.get(m.Outlet, sp.article.outlet_id)) for sp in c.supports]}
+        return page("queue.html", user, items=items, events=events, claims=claims, estado=estado,
+                    msg=request.query_params.get("msg"))
 
 
 @router.post("/fila/{item_id}")
 def resolve_item(item_id: int, estado: str = Form(...), nome: str = Form(...), resolucion: str = Form(""),
-                 csrf: str = Form(...), user: str = Depends(editor)):
+                 afirmacao: str = Form(""), csrf: str = Form(...), user: str = Depends(editor)):
     check_csrf(user, csrf)
     if estado not in ("resuelto", "descartado", "pendiente"):
         raise HTTPException(422)
     from datetime import datetime, timezone
+    msg = "Item atualizado."
     with session() as s:
         it = s.get(m.ReviewItem, item_id) or _404()
         it.estado, it.resuelto_por, it.resolucion = estado, nome.strip(), resolucion or None
         it.resuelto_en = datetime.now(timezone.utc) if estado != "pendiente" else None
-    return _back("/admin/fila", "Item atualizado.")
+        if it.target_tipo == "claim" and afirmacao in ("aceptada", "rechazada") and it.target_id.isdigit():
+            c = s.get(m.Claim, int(it.target_id))
+            if c is not None:
+                c.estado = afirmacao
+                c.verificacion = {**(c.verificacion or {}), "editor": {"nome": nome.strip(), "decisao": afirmacao,
+                                                                       "nota": resolucion,
+                                                                       "em": datetime.now(timezone.utc).isoformat()}}
+                s.add(m.HumanReview(target_tipo="claim", target_id=c.id, revisor=nome.strip(), decision=afirmacao,
+                                    comentarios=resolucion))
+                s.flush()
+                ev = s.get(m.Event, c.event_id)
+                principal = s.scalars(select(m.Cleavage).where(m.Cleavage.country_id == ev.country_id,
+                                                               m.Cleavage.tipo == "principal")).first()
+                if principal is not None:
+                    from types import SimpleNamespace
+                    from .analytics.core import apply_selection
+                    apply_selection(s, c.event_id, SimpleNamespace(corte_ingesta=datetime.now(timezone.utc)), principal)
+                msg = f"Afirmação {c.codigo}: {afirmacao}."
+    return _back("/admin/fila", msg)
 
 
 @router.get("/corridas", response_class=HTMLResponse)
@@ -390,7 +417,8 @@ def week_events(request: Request, semana: str | None = None, user: str = Depends
             arts = s.execute(select(m.Article, m.Outlet).join(m.ArticleEvent, m.ArticleEvent.article_id == m.Article.id)
                              .join(m.Outlet, m.Outlet.id == m.Article.outlet_id)
                              .where(m.ArticleEvent.event_id == ev.id).order_by(m.Article.fecha_pub)).all()
-            rows.append({"ev": ev, "arts": arts, "n_outlets": len({o.id for _, o in arts})})
+            claims = s.scalars(select(m.Claim).where(m.Claim.event_id == ev.id).order_by(m.Claim.id)).all()
+            rows.append({"ev": ev, "arts": arts, "n_outlets": len({o.id for _, o in arts}), "claims": claims})
         return page("events.html", user, rows=rows, wk=wk, prev=(wk - timedelta(days=7)).isoformat(),
                     next=(wk + timedelta(days=7)).isoformat(), msg=request.query_params.get("msg"))
 

@@ -64,7 +64,7 @@ El alojamiento puede seguir gratuito. El costo nuevo es el modelo, sobre todo la
 | Registro de corridas y pasos, cola de excepciones, nivel de autonomía | Hecho (panel: Fila de exceções, Corridas, Eventos da semana) |
 | Recolección (paso 1) | Hecho: 20 medios, cada dos horas (D28, D29) |
 | Agrupación en eventos (paso 2) | Hecho: TF-IDF + enlace promedio + revisión por agente (D30, D31) |
-| Extracción y verificación cruzada de afirmaciones (paso 3) | Pendiente |
+| Extracción y verificación cruzada de afirmaciones (paso 3) | Hecho: `kimi-k3` extrae, compuertas en código, `kimi-k2.6` verifica (D35–D43). Semana del 5/10: 67 aceptadas, 11 en revisión, desacuerdo 15 %, 8 min |
 | Redacción restringida (paso 4) | Pendiente |
 | Posición de medios por anotadores modelo (paso 5) | Pendiente |
 | Nivel de autonomía en la metodología pública | Hecho |

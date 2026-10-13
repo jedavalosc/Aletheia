@@ -28,6 +28,11 @@ def main(argv=None):
     cu.add_argument("--semana", default=None, help="Segunda-feira da semana (AAAA-MM-DD); padrão: semana atual")
     cu.add_argument("--sem-modelo", action="store_true", help="Não usar o modelo para casos duvidosos")
     cu.add_argument("--disparado-por", default="cli")
+    ex = sub.add_parser("extract", help="Passo 3: extrai afirmações dos eventos da semana, com verificação cruzada")
+    ex.add_argument("--semana", default=None, help="Segunda-feira da semana (AAAA-MM-DD); padrão: semana atual")
+    ex.add_argument("--max-eventos", type=int, default=15)
+    ex.add_argument("--refazer", action="store_true", help="Refaz eventos já processados (sem decisões do editor)")
+    ex.add_argument("--disparado-por", default="cli")
     sub.add_parser("purge-chats", help="Apaga conversas com retenção vencida")
     sub.add_parser("status", help="Resumo das edições, verificação e bandeiras")
     ev = sub.add_parser("eval-chat", help="Roda o conjunto de avaliação do chat")
@@ -69,6 +74,13 @@ def main(argv=None):
             wk = date.fromisoformat(a.semana) if a.semana else None
             print(json.dumps(cluster_week(s, get_settings().country_code, wk, use_model=not a.sem_modelo,
                                           disparado_por=a.disparado_por), ensure_ascii=False, default=str))
+    elif a.cmd == "extract":
+        from datetime import date
+        from .agents.extract import extract_week
+        with session() as s:
+            wk = date.fromisoformat(a.semana) if a.semana else None
+            print(json.dumps(extract_week(s, get_settings().country_code, wk, a.max_eventos, a.refazer, a.disparado_por),
+                             ensure_ascii=False, default=str))
     elif a.cmd == "build-site":
         from .site.build import build_site
         with session() as s:

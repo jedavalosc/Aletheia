@@ -49,11 +49,11 @@ class Run:
             self.s.flush()
 
     def llm(self, st: m.AgentStep, system: str, user: str, prompt_version: str, json_mode: bool = True,
-            max_tokens: int | None = None) -> dict | str:
+            max_tokens: int | None = None, role: str = "agent") -> dict | str:
         cfg = self.settings
         if self.row.costo_centavos >= self.row.tope_centavos:
             raise BudgetExceeded()
-        c: Completion = complete(cfg, system, user, json_mode=json_mode, max_tokens=max_tokens)
+        c: Completion = complete(cfg, system, user, json_mode=json_mode, max_tokens=max_tokens, role=role)
         cost = c.tokens_in / 1e6 * cfg.agent_price_in_cents_per_mtok + c.tokens_out / 1e6 * cfg.agent_price_out_cents_per_mtok
         st.modelo, st.prompt_version = c.model, prompt_version
         st.tokens_in += c.tokens_in

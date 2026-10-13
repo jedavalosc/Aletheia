@@ -9,10 +9,10 @@ Stages:  ingest -> normalise/dedupe -> embed+entities -> cluster (7-day window)
          -> atomic claims -> cross-article alignment -> framing | coverage |
          selection + constrained drafting -> sentence verifier -> human review
          -> translation -> static site on approval.
-Implemented: collection (step 1), grouping into candidate events (step 2), and
+Implemented: collection (step 1), grouping into candidate events (step 2),
 the stages that run on loaded events (selection, coverage, blind spots,
-framing, verifier, standard visuals). Claim extraction (step 3) and drafting
-(step 4) are next; see docs/agentes.md.
+framing, verifier, standard visuals). claim extraction with cross-check (step 3).
+Drafting (step 4) is next; see docs/agentes.md.
 """
 from __future__ import annotations
 
@@ -66,6 +66,13 @@ def group(window: dict) -> dict:
         return cluster_week(s, get_settings().country_code, window["semana_inicio"].date(), disparado_por="pipeline")
 
 
+def extract(window: dict) -> dict:
+    """Step 3: atomic claims with an independent cross-check (agent + checker + gates)."""
+    from ..agents.extract import extract_week
+    with session() as s:
+        return extract_week(s, get_settings().country_code, window["semana_inicio"].date(), disparado_por="pipeline")
+
+
 def run(force: bool = False, now: datetime | None = None) -> int:
     now = now or datetime.now(timezone.utc)
     country = get_settings().country_code
@@ -95,6 +102,7 @@ def run(force: bool = False, now: datetime | None = None) -> int:
             log.info("Edição n.º %s criada em rascunho.", ed.numero)
     log.info("Recoleção: %s", ingest(win))
     log.info("Agrupamento: %s", group(win))
+    log.info("Afirmações: %s", extract(win))
     with session() as s:
         ed = s.scalars(select(m.Edition).where(m.Edition.country_id == country,
                                                m.Edition.semana_inicio == win["semana_inicio"],

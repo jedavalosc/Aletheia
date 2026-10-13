@@ -91,7 +91,7 @@ def apply_selection(s: Session, event_id: int, edition: m.Edition, cleavage: m.C
     for pm in members:
         for oid in pm.outlet_ids:
             pole_of[oid] = pm.pole.slug
-    claims = s.scalars(select(m.Claim).where(m.Claim.event_id == event_id)).all()
+    claims = s.scalars(select(m.Claim).where(m.Claim.event_id == event_id, m.Claim.estado == "aceptada")).all()
     # Disputed figures: same measure, different values -> always attributed by source.
     values_by_measure = defaultdict(set)
     for c in claims:
@@ -121,7 +121,7 @@ def compute_coverage(s: Session, edition: m.Edition, event: m.Event, cleavages: 
     arts = _event_articles(s, event.id, edition)
     covering_event = {a.outlet_id for a in arts}
     art_ids = {a.id for a in arts}
-    claims = s.scalars(select(m.Claim).where(m.Claim.event_id == event.id)).all()
+    claims = s.scalars(select(m.Claim).where(m.Claim.event_id == event.id, m.Claim.estado == "aceptada")).all()
     covering_claim = {c.codigo: {sp.article.outlet_id for sp in c.supports if sp.article_id in art_ids} for c in claims}
     ts = edition.corte_ingesta
     for cl in cleavages:
@@ -171,7 +171,7 @@ def compute_framing(s: Session, edition: m.Edition, event: m.Event, cleavages: l
     active = active_outlets(s, edition)
     arts = _event_articles(s, event.id, edition)
     art_ids = {a.id for a in arts}
-    claims = s.scalars(select(m.Claim).where(m.Claim.event_id == event.id)).all()
+    claims = s.scalars(select(m.Claim).where(m.Claim.event_id == event.id, m.Claim.estado == "aceptada")).all()
     ts = edition.corte_ingesta
     for cl in cleavages:
         members = pole_members(s, cl, ts)

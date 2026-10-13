@@ -23,6 +23,22 @@ def _database_url() -> str:
     return url
 
 
+def _default_verifier_model() -> str:
+    agent = os.environ.get("AGENT_MODEL") or os.environ.get("CHAT_MODEL", "claude-sonnet-5-5")
+    alternatives = {"kimi-k3": "kimi-k2.6", "kimi-k2.6": "kimi-k3"}
+    return alternatives.get(agent, agent)
+
+
+def _thinking(env: str, provider: str, model: str) -> str | None:
+    """Kimi reasoning mode for agent and verifier calls: 'disabled', 'enabled', or None (send nothing).
+    Defaults to 'disabled' for Kimi models: with reasoning on, kimi-k3 spends ~10k tokens and ~5 minutes
+    per extraction; with it off, ~2k tokens and ~45 s, and the claims still pass the code gates (D40)."""
+    v = os.environ.get(env)
+    if v is not None:
+        return v.strip().lower() or None
+    return "disabled" if provider == "openai_compatible" and model.startswith("kimi-") else None
+
+
 def _int(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, default))
@@ -79,6 +95,24 @@ class Settings:
                                                                             _int("CHAT_PRICE_IN_CENTS_PER_MTOK", 300)))
     agent_price_out_cents_per_mtok: int = field(default_factory=lambda: _int("AGENT_PRICE_OUT_CENTS_PER_MTOK",
                                                                              _int("CHAT_PRICE_OUT_CENTS_PER_MTOK", 1500)))
+    # Independent checker for agent output (step 3). Ideally a different provider; defaults to a
+    # different model on the same provider when only one key is available (docs/decisiones.md D36).
+    verifier_provider: str = field(default_factory=lambda: os.environ.get("VERIFIER_PROVIDER")
+                                   or os.environ.get("AGENT_PROVIDER") or os.environ.get("CHAT_PROVIDER", "anthropic"))
+    verifier_model: str = field(default_factory=lambda: os.environ.get("VERIFIER_MODEL") or _default_verifier_model())
+    verifier_base_url: str = field(default_factory=lambda: os.environ.get("VERIFIER_BASE_URL")
+                                   or os.environ.get("AGENT_BASE_URL") or os.environ.get("CHAT_BASE_URL", "https://api.moonshot.ai/v1"))
+    verifier_api_key: str | None = field(default_factory=lambda: os.environ.get("VERIFIER_API_KEY")
+                                         or os.environ.get("AGENT_API_KEY") or os.environ.get("CHAT_API_KEY")
+                                         or os.environ.get("ANTHROPIC_API_KEY") or None)
+    @property
+    def agent_thinking(self) -> str | None:
+        return _thinking("AGENT_THINKING", self.agent_provider, self.agent_model)
+
+    @property
+    def verifier_thinking(self) -> str | None:
+        return _thinking("VERIFIER_THINKING", self.verifier_provider, self.verifier_model)
+
     collector_user_agent: str = field(default_factory=lambda: os.environ.get(
         "COLLECTOR_USER_AGENT", "AletheiaNewsBot/0.1 (+https://aletheia-news.org/pt/metodologia.html)"))
 

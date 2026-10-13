@@ -253,6 +253,10 @@ class Claim(Base):
     valor: Mapped[float | None] = mapped_column(Float, nullable=True)
     unidad: Mapped[str | None] = mapped_column(String(40), nullable=True)
     fuente_primaria: Mapped[dict | None] = mapped_column(JSONType, nullable=True)  # {nombre,url,verificada_en}
+    # Agentic extraction (step 3): only 'aceptada' claims feed selection, coverage and drafting.
+    estado: Mapped[str] = mapped_column(String(12), default="aceptada", server_default="aceptada")  # aceptada/en_revision/rechazada
+    origen: Mapped[str] = mapped_column(String(10), default="manual", server_default="manual")  # agente/manual/demo
+    verificacion: Mapped[dict | None] = mapped_column(JSONType, nullable=True)  # extractor + checker verdicts
     supports: Mapped[list["ClaimSupport"]] = relationship(back_populates="claim")
 
 
