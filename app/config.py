@@ -64,6 +64,23 @@ class Settings:
     public_base_url: str = field(default_factory=lambda: os.environ.get("PUBLIC_BASE_URL")
                                  or os.environ.get("RENDER_EXTERNAL_URL") or "http://localhost:8080")
     country_code: str = field(default_factory=lambda: os.environ.get("COUNTRY", "BR"))
+    # Agents (docs/agentes.md). Default to the chat provider unless overridden.
+    agent_provider: str = field(default_factory=lambda: os.environ.get("AGENT_PROVIDER")
+                                or os.environ.get("CHAT_PROVIDER", "anthropic"))
+    agent_model: str = field(default_factory=lambda: os.environ.get("AGENT_MODEL")
+                             or os.environ.get("CHAT_MODEL", "claude-sonnet-5-5"))
+    agent_base_url: str = field(default_factory=lambda: os.environ.get("AGENT_BASE_URL")
+                                or os.environ.get("CHAT_BASE_URL", "https://api.moonshot.ai/v1"))
+    agent_api_key: str | None = field(default_factory=lambda: os.environ.get("AGENT_API_KEY")
+                                      or os.environ.get("CHAT_API_KEY") or os.environ.get("ANTHROPIC_API_KEY") or None)
+    agent_max_tokens: int = field(default_factory=lambda: _int("AGENT_MAX_TOKENS", 4000))
+    agent_budget_cents_per_run: int = field(default_factory=lambda: _int("AGENT_BUDGET_CENTS_PER_RUN", 100))
+    agent_price_in_cents_per_mtok: int = field(default_factory=lambda: _int("AGENT_PRICE_IN_CENTS_PER_MTOK",
+                                                                            _int("CHAT_PRICE_IN_CENTS_PER_MTOK", 300)))
+    agent_price_out_cents_per_mtok: int = field(default_factory=lambda: _int("AGENT_PRICE_OUT_CENTS_PER_MTOK",
+                                                                             _int("CHAT_PRICE_OUT_CENTS_PER_MTOK", 1500)))
+    collector_user_agent: str = field(default_factory=lambda: os.environ.get(
+        "COLLECTOR_USER_AGENT", "AletheiaNewsBot/0.1 (+https://aletheia-news.org/pt/metodologia.html)"))
 
 
 LANGS = ("pt", "es", "en")

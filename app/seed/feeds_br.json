@@ -1,0 +1,58 @@
+{
+  "_nota": "Fuentes de ingesta verificadas el 12/10/2026: responden, tienen entradas y robots.txt las permite para AletheiaNewsBot. tipo rss = titular + resumen; tipo news_sitemap = Google News sitemap (titular + fecha, ~48 h). Sin fuente utilizable: GZH (RSS vacío, sin sitemap), Band (certificado TLS inválido desde el recolector).",
+  "Folha de S.Paulo": [
+    {"tipo": "rss", "url": "https://feeds.folha.uol.com.br/poder/rss091.xml"},
+    {"tipo": "rss", "url": "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml"}
+  ],
+  "O Estado de S. Paulo (Estadão)": [
+    {"tipo": "rss", "url": "https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/politica/"},
+    {"tipo": "rss", "url": "https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/geral/?body=%7B%22layout%22:%22google-news%22%7D"}
+  ],
+  "O Globo": [{"tipo": "rss", "url": "https://oglobo.globo.com/rss/oglobo"}],
+  "g1": [
+    {"tipo": "rss", "url": "https://g1.globo.com/rss/g1/politica/"},
+    {"tipo": "rss", "url": "https://g1.globo.com/rss/g1/economia/"},
+    {"tipo": "rss", "url": "https://g1.globo.com/rss/g1/"}
+  ],
+  "UOL": [{"tipo": "rss", "url": "https://rss.uol.com.br/feed/noticias.xml"}],
+  "Metrópoles": [
+    {"tipo": "rss", "url": "https://www.metropoles.com/feed"},
+    {"tipo": "news_sitemap", "url": "https://www.metropoles.com/sitemap/google-news.xml"}
+  ],
+  "Poder360": [{"tipo": "rss", "url": "https://www.poder360.com.br/feed/"}],
+  "CNN Brasil": [
+    {"tipo": "rss", "url": "https://www.cnnbrasil.com.br/feed/"},
+    {"tipo": "news_sitemap", "url": "https://www.cnnbrasil.com.br/sitemap-news.xml"}
+  ],
+  "Jovem Pan": [{"tipo": "rss", "url": "https://jovempan.com.br/feed"}],
+  "Gazeta do Povo": [
+    {"tipo": "rss", "url": "https://www.gazetadopovo.com.br/feed/rss/republica.xml"},
+    {"tipo": "rss", "url": "https://www.gazetadopovo.com.br/feed/rss/ultimas-noticias.xml"}
+  ],
+  "Revista Oeste": [
+    {"tipo": "rss", "url": "https://revistaoeste.com/feed/"},
+    {"tipo": "news_sitemap", "url": "https://revistaoeste.com/oestegeral/sitemap-news.xml"}
+  ],
+  "CartaCapital": [{"tipo": "rss", "url": "https://www.cartacapital.com.br/feed/"}],
+  "Brasil de Fato": [{"tipo": "rss", "url": "https://www.brasildefato.com.br/feed"}],
+  "Correio Braziliense": [
+    {"tipo": "rss", "url": "https://www.correiobraziliense.com.br/feed/"},
+    {"tipo": "news_sitemap", "url": "https://www.correiobraziliense.com.br/sitemap/map/day/sitemap-news.xml"}
+  ],
+  "Jornal do Commercio": [{"tipo": "rss", "url": "https://jc.uol.com.br/ultimas/rss.xml"}],
+  "Diário do Nordeste": [{"tipo": "rss", "url": "https://diariodonordeste.verdesmares.com.br/cmlink/feed-1.3009099"}],
+  "A Tarde": [{"tipo": "rss", "url": "https://atarde.com.br/rss"}],
+  "O Liberal": [
+    {"tipo": "rss", "url": "https://www.oliberal.com/cmlink/politica-oliberal-com-1.332277"},
+    {"tipo": "rss", "url": "https://www.oliberal.com/cmlink/economia-oliberal-com-1.336639"},
+    {"tipo": "rss", "url": "https://www.oliberal.com/cmlink/oliberal-com-1.169551"}
+  ],
+  "Record (R7)": [{"tipo": "news_sitemap", "url": "https://noticias.r7.com/arc/outboundfeeds/sitemap-news/?outputType=xml"}],
+  "SBT News": [{"tipo": "news_sitemap", "url": "https://sbtnews.sbt.com.br/sitemap-news-1.xml"}],
+  "Agência Brasil (EBC)": [
+    {"tipo": "rss", "url": "https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml"},
+    {"tipo": "rss", "url": "https://agenciabrasil.ebc.com.br/rss/politica/feed.xml"}
+  ],
+  "GZH": [],
+  "Band (portal)": []
+}

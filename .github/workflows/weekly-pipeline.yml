@@ -1,6 +1,6 @@
 # Weekly pipeline (free on GitHub Actions). Runs Saturday 06:00 UTC = 03:00 BRT,
 # inside the production window (Saturday 00:00 to Monday 06:00 BRT).
-# Needs the repository secret DATABASE_URL (same Neon string as on Render):
+# Needs the repository secrets DATABASE_URL (same Neon string as on Render) and CHAT_API_KEY (Kimi key):
 # Settings → Secrets and variables → Actions → New repository secret.
 name: weekly-pipeline
 on:
@@ -15,7 +15,7 @@ on:
 jobs:
   pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,6 +27,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           COUNTRY: BR
+          # Agents use the same model provider as the chat. The key is a repository secret.
+          CHAT_PROVIDER: openai_compatible
+          CHAT_BASE_URL: https://api.moonshot.ai/v1
+          CHAT_MODEL: kimi-k3
+          CHAT_API_KEY: ${{ secrets.CHAT_API_KEY }}
+          AGENT_BUDGET_CENTS_PER_RUN: "100"
         run: |
           alembic upgrade head
           if [ "${{ inputs.forcar }}" = "true" ]; then python -m app.pipeline.weekly --forcar; else python -m app.pipeline.weekly; fi

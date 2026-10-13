@@ -53,6 +53,9 @@ class Country(Base):
     # Election dates, incoming government, etc. live here as sourced data, never in code.
     contexto: Mapped[list] = mapped_column(JSONType, default=list)  # [{texto, fuente, fecha}]
     data_gaps: Mapped[list] = mapped_column(JSONType, default=list)  # declared ingestion gaps
+    # Autonomy level of the agentic process (docs/agentes.md): 0 drafts only,
+    # 1 editor approves from the exception queue, 2 auto-publish + post review, 3 audits.
+    autonomy_level: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
 
 class Cleavage(Base):
@@ -182,6 +185,11 @@ class Event(Base):
     razon_inclusion: Mapped[str | None] = mapped_column(Text, nullable=True)
     razon_inclusion_confirmada_por: Mapped[str | None] = mapped_column(String(120), nullable=True)
     es_ficticio: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Agentic grouping: origin, cohesion of the cluster and the week it belongs to.
+    origen: Mapped[str] = mapped_column(String(10), default="manual", server_default="manual")  # agente/manual/demo
+    confianza: Mapped[float | None] = mapped_column(Float, nullable=True)
+    semana_inicio: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    fuera_de_alcance: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     __table_args__ = (
         CheckConstraint("tema_excepcional = false OR razon_inclusion IS NOT NULL",
                         name="ck_event_exceptional_reason"),
@@ -212,6 +220,10 @@ class Article(Base):
     autor: Mapped[str | None] = mapped_column(String(200), nullable=True)
     idioma: Mapped[str] = mapped_column(String(5), default="pt")
     hash_texto: Mapped[str] = mapped_column(String(64), unique=True)
+    # Short summary from the feed (RSS description), never the full article text.
+    resumen: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fuente_ingesta: Mapped[str | None] = mapped_column(String(20), nullable=True)  # rss / news_sitemap / demo
+    recolectado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # embedding: added in Phase 2 migration (pgvector), see docs/decisiones.md
     es_ficticio: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -783,3 +795,63 @@ class Dispute(Base):
     estado: Mapped[str] = mapped_column(String(20), default="recibida")  # recibida/en_analisis/aceptada/rechazada
     resolucion: Mapped[str | None] = mapped_column(Text, nullable=True)
     creado_en: Mapped[datetime] = _now()
+
+
+# ---------------------------------------------------------------------- agents
+
+class AgentRun(Base):
+    """One execution of a pipeline stage (collect, cluster, extract, ...)."""
+    __tablename__ = "agent_run"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    country_id: Mapped[str] = mapped_column(ForeignKey("country.id"))
+    tipo: Mapped[str] = mapped_column(String(20))
+    edition_id: Mapped[int | None] = mapped_column(ForeignKey("edition.id"), nullable=True)
+    autonomy_level: Mapped[int] = mapped_column(Integer)
+    estado: Mapped[str] = mapped_column(String(20), default="corriendo")  # corriendo/ok/fallo/tope_gasto
+    iniciado_en: Mapped[datetime] = _now()
+    terminado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    costo_centavos: Mapped[float] = mapped_column(Float, default=0)
+    tope_centavos: Mapped[float] = mapped_column(Float, default=0)
+    resumen: Mapped[dict] = mapped_column(JSONType, default=dict)
+    disparado_por: Mapped[str] = mapped_column(String(40), default="cli")  # cli/cron/panel
+    steps: Mapped[list["AgentStep"]] = relationship(order_by="AgentStep.id")
+
+
+class AgentStep(Base):
+    """Provenance of one unit of work inside a run. Model calls record model,
+    prompt version, tokens and cost; deterministic steps leave those empty."""
+    __tablename__ = "agent_step"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("agent_run.id", ondelete="CASCADE"))
+    agente: Mapped[str] = mapped_column(String(40))
+    objetivo: Mapped[str] = mapped_column(String(300), default="")  # e.g. feed URL, event id
+    modelo: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    entrada: Mapped[dict] = mapped_column(JSONType, default=dict)
+    salida: Mapped[dict] = mapped_column(JSONType, default=dict)
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    costo_centavos: Mapped[float] = mapped_column(Float, default=0)
+    duracion_ms: Mapped[int] = mapped_column(Integer, default=0)
+    estado: Mapped[str] = mapped_column(String(20), default="ok")  # ok/fallo/omitido
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    creado_en: Mapped[datetime] = _now()
+
+
+class ReviewItem(Base):
+    """Exception queue: what a code gate could not resolve goes to the editor."""
+    __tablename__ = "review_item"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    country_id: Mapped[str] = mapped_column(ForeignKey("country.id"))
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("agent_run.id", ondelete="SET NULL"), nullable=True)
+    tipo: Mapped[str] = mapped_column(String(30))  # fuente_fallando/agrupacion_dudosa/alcance_dudoso/titulo_cargado/...
+    target_tipo: Mapped[str] = mapped_column(String(30))
+    target_id: Mapped[str] = mapped_column(String(80))
+    motivo: Mapped[str] = mapped_column(Text)
+    datos: Mapped[dict] = mapped_column(JSONType, default=dict)
+    prioridad: Mapped[int] = mapped_column(Integer, default=2)  # 1 high, 2 normal, 3 low
+    estado: Mapped[str] = mapped_column(String(20), default="pendiente")  # pendiente/resuelto/descartado
+    resuelto_por: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    resolucion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    creado_en: Mapped[datetime] = _now()
+    resuelto_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

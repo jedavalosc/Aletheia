@@ -64,7 +64,11 @@ def home(request: Request, user: str = Depends(editor)):
         rows = [{"ed": e, "gates": edition_gates(s, e) if e.estado != "publicada" else []} for e in eds]
         disputes = s.scalars(select(m.Dispute).where(m.Dispute.estado == "recibida")).all()
         sugs = s.scalars(select(m.ChatSuggestion).where(m.ChatSuggestion.estado == "pendiente")).all()
-        return page("home.html", user, rows=rows, n_disputes=len(disputes), n_sugs=len(sugs), msg=request.query_params.get("msg"))
+        country = s.get(m.Country, get_settings().country_code)
+        n_queue = len(s.scalars(select(m.ReviewItem.id).where(m.ReviewItem.estado == "pendiente")).all())
+        last_runs = s.scalars(select(m.AgentRun).order_by(m.AgentRun.id.desc()).limit(5)).all()
+        return page("home.html", user, rows=rows, n_disputes=len(disputes), n_sugs=len(sugs), country=country,
+                    n_queue=n_queue, last_runs=last_runs, msg=request.query_params.get("msg"))
 
 
 @router.get("/edicao/{ed_id}", response_class=HTMLResponse)
@@ -325,3 +329,129 @@ def suggestion_state(s_id: int, estado: str = Form(...), csrf: str = Form(...), 
         x = s.get(m.ChatSuggestion, s_id) or _404()
         x.estado = estado
     return _back("/admin/entradas", "Sugestão atualizada.")
+
+
+# ---- agentic process: exception queue, run log, candidate events, autonomy (docs/agentes.md)
+
+@router.get("/fila", response_class=HTMLResponse)
+def queue(request: Request, estado: str = "pendiente", user: str = Depends(editor)):
+    with session() as s:
+        items = s.scalars(select(m.ReviewItem).where(m.ReviewItem.estado == estado)
+                          .order_by(m.ReviewItem.prioridad, m.ReviewItem.id.desc()).limit(300)).all()
+        events = {int(i.target_id): s.get(m.Event, int(i.target_id)) for i in items
+                  if i.target_tipo == "event" and i.target_id.isdigit()}
+        return page("queue.html", user, items=items, events=events, estado=estado, msg=request.query_params.get("msg"))
+
+
+@router.post("/fila/{item_id}")
+def resolve_item(item_id: int, estado: str = Form(...), nome: str = Form(...), resolucion: str = Form(""),
+                 csrf: str = Form(...), user: str = Depends(editor)):
+    check_csrf(user, csrf)
+    if estado not in ("resuelto", "descartado", "pendiente"):
+        raise HTTPException(422)
+    from datetime import datetime, timezone
+    with session() as s:
+        it = s.get(m.ReviewItem, item_id) or _404()
+        it.estado, it.resuelto_por, it.resolucion = estado, nome.strip(), resolucion or None
+        it.resuelto_en = datetime.now(timezone.utc) if estado != "pendiente" else None
+    return _back("/admin/fila", "Item atualizado.")
+
+
+@router.get("/corridas", response_class=HTMLResponse)
+def runs(request: Request, user: str = Depends(editor)):
+    with session() as s:
+        rows = s.scalars(select(m.AgentRun).order_by(m.AgentRun.id.desc()).limit(60)).all()
+        return page("runs.html", user, rows=rows, msg=request.query_params.get("msg"))
+
+
+@router.get("/corridas/{run_id}", response_class=HTMLResponse)
+def run_detail(run_id: int, request: Request, user: str = Depends(editor)):
+    with session() as s:
+        r = s.get(m.AgentRun, run_id) or _404()
+        steps = s.scalars(select(m.AgentStep).where(m.AgentStep.run_id == run_id).order_by(m.AgentStep.id)).all()
+        return page("run.html", user, r=r, steps=steps, msg=request.query_params.get("msg"))
+
+
+def _week_start(semana: str | None):
+    from .agents.cluster import current_monday, week_bounds
+    wk = date.fromisoformat(semana) if semana else current_monday()
+    return wk, week_bounds(wk)[0]
+
+
+@router.get("/eventos", response_class=HTMLResponse)
+def week_events(request: Request, semana: str | None = None, user: str = Depends(editor)):
+    from datetime import timedelta
+    wk, start = _week_start(semana)
+    with session() as s:
+        evs = s.scalars(select(m.Event).where(m.Event.semana_inicio == start, m.Event.es_ficticio.is_(False))
+                        .order_by(m.Event.fuera_de_alcance, m.Event.impacto.desc())).all()
+        rows = []
+        for ev in evs:
+            arts = s.execute(select(m.Article, m.Outlet).join(m.ArticleEvent, m.ArticleEvent.article_id == m.Article.id)
+                             .join(m.Outlet, m.Outlet.id == m.Article.outlet_id)
+                             .where(m.ArticleEvent.event_id == ev.id).order_by(m.Article.fecha_pub)).all()
+            rows.append({"ev": ev, "arts": arts, "n_outlets": len({o.id for _, o in arts})})
+        return page("events.html", user, rows=rows, wk=wk, prev=(wk - timedelta(days=7)).isoformat(),
+                    next=(wk + timedelta(days=7)).isoformat(), msg=request.query_params.get("msg"))
+
+
+@router.post("/eventos/{ev_id}")
+def edit_event(ev_id: int, accion: str = Form(...), nome: str = Form(...), titulo: str = Form(""),
+               seccion: str = Form(""), destino: str = Form(""), razon: str = Form(""), csrf: str = Form(...),
+               user: str = Depends(editor)):
+    """Editor decisions on a candidate event. Confirmed events survive later regroupings."""
+    check_csrf(user, csrf)
+    from sqlalchemy import delete as sqldelete
+    from .editorial import load_terms
+    from .rules.loaded_terms import violations
+    with session() as s:
+        ev = s.get(m.Event, ev_id) or _404()
+        wk = ev.semana_inicio.astimezone(__import__("zoneinfo").ZoneInfo("America/Sao_Paulo")).date().isoformat() if ev.semana_inicio else ""
+        if accion == "confirmar":
+            if titulo.strip():
+                bad = violations(titulo, load_terms(s, ev.country_id, "pt"), "pt")
+                if bad:
+                    return _back(f"/admin/eventos?semana={wk}", "Título com termo carregado: " + ", ".join(h.termino for h in bad))
+                ev.titulo_provisional = titulo.strip()
+            if seccion:
+                ev.seccion, ev.secciones_tocadas = seccion, [seccion]
+            ev.estado, ev.fuera_de_alcance = "confirmado", False
+        elif accion == "fora":
+            ev.fuera_de_alcance, ev.estado = True, "confirmado"
+        elif accion == "fundir":
+            dest = s.get(m.Event, int(destino)) if destino.isdigit() else None
+            if dest is None or dest.id == ev.id:
+                return _back(f"/admin/eventos?semana={wk}", "Evento de destino inválido.")
+            for ae in s.scalars(select(m.ArticleEvent).where(m.ArticleEvent.event_id == ev.id)).all():
+                if s.get(m.ArticleEvent, (ae.article_id, dest.id)) is None:
+                    s.add(m.ArticleEvent(article_id=ae.article_id, event_id=dest.id, score_similitud=ae.score_similitud,
+                                         asignacion="manual"))
+            s.execute(sqldelete(m.ArticleEvent).where(m.ArticleEvent.event_id == ev.id))
+            s.flush()
+            dest.estado = "confirmado"
+            s.delete(ev)
+        elif accion == "quitar_articulo":
+            if destino.isdigit():
+                s.execute(sqldelete(m.ArticleEvent).where(m.ArticleEvent.event_id == ev.id,
+                                                          m.ArticleEvent.article_id == int(destino)))
+            ev.estado = "confirmado"
+        else:
+            raise HTTPException(422)
+        s.add(m.HumanReview(target_tipo="event", target_id=ev_id, revisor=nome.strip(), decision=accion,
+                            comentarios=razon or titulo))
+    return _back(f"/admin/eventos?semana={wk}", "Evento atualizado.")
+
+
+@router.post("/autonomia")
+def set_autonomy(nivel: int = Form(...), nome: str = Form(...), razon: str = Form(...), csrf: str = Form(...),
+                 user: str = Depends(editor)):
+    check_csrf(user, csrf)
+    if nivel not in (0, 1, 2, 3):
+        raise HTTPException(422)
+    with session() as s:
+        c = s.get(m.Country, get_settings().country_code) or _404()
+        old = c.autonomy_level
+        c.autonomy_level = nivel
+        s.add(m.HumanReview(target_tipo="autonomia", target_id=0, revisor=nome.strip(), decision=f"{old}->{nivel}",
+                            comentarios=razon))
+    return _back("/admin", f"Nível de autonomia: {old} → {nivel}.")

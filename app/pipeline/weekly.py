@@ -9,9 +9,10 @@ Stages:  ingest -> normalise/dedupe -> embed+entities -> cluster (7-day window)
          -> atomic claims -> cross-article alignment -> framing | coverage |
          selection + constrained drafting -> sentence verifier -> human review
          -> translation -> static site on approval.
-Phase 1 implements the stages that run on already-loaded events (selection,
-coverage, blind spots, framing, verifier, standard visuals). Ingestion,
-clustering, claim extraction and drafting are Phase 2 (see docs/decisiones.md).
+Implemented: collection (step 1), grouping into candidate events (step 2), and
+the stages that run on loaded events (selection, coverage, blind spots,
+framing, verifier, standard visuals). Claim extraction (step 3) and drafting
+(step 4) are next; see docs/agentes.md.
 """
 from __future__ import annotations
 
@@ -50,10 +51,19 @@ def week_window(now: datetime) -> dict | None:
             "publicacion_prevista": monday + timedelta(days=7, hours=6)}
 
 
-def ingest(window: dict) -> int:
-    log.warning("Ingestão real é a fase 2: nenhum artigo novo coletado (janela %s – %s).",
-                window["semana_inicio"], window["corte_ingesta"])
-    return 0
+def ingest(window: dict) -> dict:
+    """Step 1 (collection) runs every two hours during the week; one more pass here
+    catches anything published just before the cutoff."""
+    from ..agents.collect import collect
+    with session() as s:
+        return collect(s, get_settings().country_code, disparado_por="pipeline")
+
+
+def group(window: dict) -> dict:
+    """Step 2: group the week's articles into candidate events (agent + gates)."""
+    from ..agents.cluster import cluster_week
+    with session() as s:
+        return cluster_week(s, get_settings().country_code, window["semana_inicio"].date(), disparado_por="pipeline")
 
 
 def run(force: bool = False, now: datetime | None = None) -> int:
@@ -83,7 +93,8 @@ def run(force: bool = False, now: datetime | None = None) -> int:
             s.add(ed)
             s.flush()
             log.info("Edição n.º %s criada em rascunho.", ed.numero)
-    ingest(win)
+    log.info("Recoleção: %s", ingest(win))
+    log.info("Agrupamento: %s", group(win))
     with session() as s:
         ed = s.scalars(select(m.Edition).where(m.Edition.country_id == country,
                                                m.Edition.semana_inicio == win["semana_inicio"],

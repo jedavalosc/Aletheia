@@ -6,7 +6,7 @@ import json
 import subprocess
 import sys
 
-from .config import ROOT
+from .config import ROOT, get_settings
 from .db import session
 
 
@@ -21,6 +21,13 @@ def main(argv=None):
     sd.add_argument("--se-ausente", action="store_true", help="Não falha se a demonstração já existir")
     sub.add_parser("reset-demo", help="Remove a edição de demonstração e todo dado fictício")
     sub.add_parser("build-site", help="Gera o site estático a partir das edições publicadas")
+    co = sub.add_parser("collect", help="Passo 1: recolhe artigos (RSS e sitemaps de notícias)")
+    co.add_argument("--medios", nargs="*", default=None, help="Limitar a estes veículos (nomes exatos)")
+    co.add_argument("--disparado-por", default="cli")
+    cu = sub.add_parser("cluster", help="Passo 2: agrupa os artigos da semana em eventos")
+    cu.add_argument("--semana", default=None, help="Segunda-feira da semana (AAAA-MM-DD); padrão: semana atual")
+    cu.add_argument("--sem-modelo", action="store_true", help="Não usar o modelo para casos duvidosos")
+    cu.add_argument("--disparado-por", default="cli")
     sub.add_parser("purge-chats", help="Apaga conversas com retenção vencida")
     sub.add_parser("status", help="Resumo das edições, verificação e bandeiras")
     ev = sub.add_parser("eval-chat", help="Roda o conjunto de avaliação do chat")
@@ -51,6 +58,17 @@ def main(argv=None):
         with session() as s:
             reset_demo(s)
         print("Demonstração removida.")
+    elif a.cmd == "collect":
+        from .agents.collect import collect
+        with session() as s:
+            print(json.dumps(collect(s, get_settings().country_code, a.disparado_por, a.medios), ensure_ascii=False))
+    elif a.cmd == "cluster":
+        from datetime import date
+        from .agents.cluster import cluster_week
+        with session() as s:
+            wk = date.fromisoformat(a.semana) if a.semana else None
+            print(json.dumps(cluster_week(s, get_settings().country_code, wk, use_model=not a.sem_modelo,
+                                          disparado_por=a.disparado_por), ensure_ascii=False, default=str))
     elif a.cmd == "build-site":
         from .site.build import build_site
         with session() as s:

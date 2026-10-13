@@ -43,3 +43,29 @@ METHOD = {
   'id_h': 'Visual identity (provisional)', 'id': 'Pole colors with equal lightness and saturation, no red, green or yellow, pending a blind test. Initial exclusion list, to be confirmed by the country team after the election:',
   'ctx_h': 'Country context', 'chat_h': 'Conversation with the AI', 'chat': 'The AI only discusses this edition: claims, chronicles, coverage, academic analysis and this methodology. It does not browse the web. Every factual sentence cites claim_ids and is verified before it is shown; if verification fails, the answer is not sent. It builds no reader profile and does not infer the reader\'s pole.',
   'conf': 'confirmed', 'pend': 'to be confirmed', 'hyp': 'hypothesis'}}
+
+# Agentic process (docs/agentes.md). {n} is the current autonomy level.
+METHOD["pt"].update({
+    "auto_h": "Processo automatizado",
+    "auto": "Cada etapa (recolha, agrupamento em eventos e, em seguida, extração de afirmações e redação) é executada por "
+            "agentes de software com modelos de linguagem. As regras que decidem o que se publica estão em código e não "
+            "podem ser alteradas pelos agentes. Cada passo fica registrado com modelo, versão das instruções e custo. "
+            "Nível de autonomia atual: {n} (0: tudo revisado por pessoa; 1: o editor aprova a edição a partir de uma fila "
+            "de exceções; 2: publicação automática do que passa em todas as verificações, com revisão posterior; 3: "
+            "auditorias periódicas). O nível só sobe com evidência de pelo menos quatro edições reais."})
+METHOD["es"].update({
+    "auto_h": "Proceso automatizado",
+    "auto": "Cada etapa (recolección, agrupación en eventos y, luego, extracción de afirmaciones y redacción) la ejecutan "
+            "agentes de software con modelos de lenguaje. Las reglas que deciden qué se publica están en código y los "
+            "agentes no pueden cambiarlas. Cada paso queda registrado con modelo, versión de las instrucciones y costo. "
+            "Nivel de autonomía actual: {n} (0: todo revisado por una persona; 1: el editor aprueba la edición desde una "
+            "cola de excepciones; 2: publicación automática de lo que pasa todas las verificaciones, con revisión "
+            "posterior; 3: auditorías periódicas). El nivel solo sube con evidencia de al menos cuatro ediciones reales."})
+METHOD["en"].update({
+    "auto_h": "Automated process",
+    "auto": "Each stage (collection, grouping into events and, next, claim extraction and drafting) is run by software "
+            "agents using language models. The rules that decide what gets published are in code and the agents cannot "
+            "change them. Every step is logged with its model, instruction version and cost. Current autonomy level: {n} "
+            "(0: everything reviewed by a person; 1: the editor approves the edition from an exception queue; 2: "
+            "automatic publication of what passes every check, reviewed afterwards; 3: periodic audits). The level only "
+            "rises on evidence from at least four real editions."})

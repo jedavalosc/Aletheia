@@ -1,4 +1,15 @@
 {% extends "base.html" %}{% block main %}
+{% if country %}<section style="border-top:0;margin-top:0"><h2 style="margin-top:0">Processo agêntico</h2>
+<p>Nível de autonomia: <b>{{ country.autonomy_level }}</b> <span class="muted">(0 rascunhos · 1 editor aprova a partir da fila · 2 publicação automática com revisão posterior · 3 auditorias)</span>.
+Fila de exceções: <a href="/admin/fila"><b>{{ n_queue }}</b> pendentes</a>.</p>
+<table><thead><tr><th>Corrida</th><th>Tipo</th><th>Estado</th><th>Custo (¢)</th><th>Resumo</th></tr></thead><tbody>
+{% for r in last_runs %}<tr><td><a href="/admin/corridas/{{ r.id }}">#{{ r.id }}</a> <span class="muted">{{ r.iniciado_en.strftime('%d/%m %H:%M') }}</span></td><td>{{ r.tipo }}</td><td>{{ r.estado }}</td><td>{{ '%.2f'|format(r.costo_centavos) }}</td><td class="muted">{{ r.resumen|tojson|truncate(140) }}</td></tr>{% else %}<tr><td colspan="5" class="muted">Nenhuma corrida ainda.</td></tr>{% endfor %}</tbody></table>
+<details><summary>Mudar o nível de autonomia</summary>
+<form class="inline" method="post" action="/admin/autonomia"><input type="hidden" name="csrf" value="{{ csrf }}">
+<select name="nivel">{% for n in [0,1,2,3] %}<option{% if n == country.autonomy_level %} selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+<input name="nome" placeholder="Nome do editor" required><input name="razon" placeholder="Evidência / motivo" required size="40"><button>Salvar</button></form>
+<p class="muted">Subir de nível exige pelo menos quatro edições reais que o justifiquem (docs/agentes.md). Não passar do nível 1 durante o segundo turno.</p></details>
+</section>{% endif %}
 <h1>Edições</h1>
 <p class="muted">Nada é publicado sem aprovação de um editor com nome. A edição só pode ser aprovada quando todos os bloqueios abaixo estiverem resolvidos.</p>
 <table><thead><tr><th>N.º</th><th>Estado</th><th>Corte</th><th>Eventos</th><th>Bloqueios</th></tr></thead><tbody>

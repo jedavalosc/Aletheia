@@ -1,0 +1,27 @@
+# Step 1 — collection every two hours (free on GitHub Actions).
+# Many feeds keep only their latest 10–20 items, so collecting rarely would
+# miss articles from low-volume feeds and create false blind spots.
+# Needs the repository secret DATABASE_URL (Neon connection string).
+name: collect
+on:
+  schedule:
+    - cron: "17 */2 * * *"
+  workflow_dispatch:
+concurrency: { group: collect, cancel-in-progress: false }
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13", cache: pip}
+      - run: pip install -r requirements.txt
+      - name: Migrate and collect
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          COUNTRY: BR
+        run: |
+          alembic upgrade head
+          python -m app.cli seed-brasil
+          python -m app.cli collect --disparado-por cron

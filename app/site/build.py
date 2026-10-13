@@ -273,7 +273,8 @@ def methodology_view(ctx: Ctx, lang: str) -> dict:
     return {"outlets": rows, "axes": axes, "active_axes": [ctx.axis_label(a, lang) for a in ctx.active_axes],
             "terms": [{"t": x.termino, "alt": x.alternativa, "only_quote": x.permitido_si == "cita", "nota": x.nota} for x in terms],
             "exclusions": [{"e": x.elemento, "motivo": x.motivo, "confirmado": x.confirmado} for x in excl],
-            "gaps": [g[lang] for g in ctx.country.data_gaps], "context": ctx.country.contexto}
+            "gaps": [g[lang] for g in ctx.country.data_gaps], "context": ctx.country.contexto,
+            "autonomy": ctx.country.autonomy_level}
 
 
 def _claims_json(ctx: Ctx, ed: m.Edition, lang: str) -> dict:

@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block main %}
+<h1>Eventos da semana de {{ wk.strftime('%d/%m/%Y') }}</h1>
+<p><a href="/admin/eventos?semana={{ prev }}">← semana anterior</a> · <a href="/admin/eventos?semana={{ next }}">semana seguinte →</a></p>
+<p class="muted">Candidatos do agente de agrupamento. Um evento confirmado por você não é refeito nas próximas corridas. Impacto = amplitude da cobertura (veículos e regiões), não importância editorial.</p>
+{% for r in rows %}{% set ev = r.ev %}
+<section id="ev{{ ev.id }}"><h3>#{{ ev.id }} · {{ ev.titulo_provisional }}</h3>
+<p><span class="pill">{{ ev.estado }}</span> <span class="pill">{{ ev.seccion }}</span> <span class="pill">impacto {{ ev.impacto }}</span> <span class="pill">coesão {{ ev.confianza }}</span> <span class="pill">{{ r.n_outlets }} veículos · {{ r.arts|length }} artigos</span>
+{% if ev.fuera_de_alcance %}<span class="pill bad">fora do alcance</span>{% endif %}{% if ev.tema_excepcional %}<span class="pill">exceção: {{ ev.razon_inclusion }}</span>{% endif %}</p>
+<details><summary>Artigos</summary><table>{% for a, o in r.arts %}<tr><td>{{ a.fecha_pub.strftime('%d/%m %H:%M') }}</td><td>{{ o.nombre }}</td><td><a href="{{ a.url }}" rel="noopener">{{ a.titular }}</a></td>
+<td><form class="inline" method="post" action="/admin/eventos/{{ ev.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="quitar_articulo"><input type="hidden" name="destino" value="{{ a.id }}"><input name="nome" placeholder="Nome" required size="8"><button>Retirar</button></form></td></tr>{% endfor %}</table></details>
+<form class="inline" method="post" action="/admin/eventos/{{ ev.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="confirmar">
+<input name="titulo" value="{{ ev.titulo_provisional }}" size="60"><select name="seccion">{% for sname in ['politica','economia','justica','sociedade','meio-ambiente','saude','ciencia','educacao','internacional'] %}<option{% if sname == ev.seccion %} selected{% endif %}>{{ sname }}</option>{% endfor %}</select>
+<input name="nome" placeholder="Nome" required size="8"><button>Confirmar</button></form>
+<form class="inline" method="post" action="/admin/eventos/{{ ev.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="fundir"><input name="destino" placeholder="nº do evento destino" size="10" required><input name="nome" placeholder="Nome" required size="8"><button>Fundir</button></form>
+<form class="inline" method="post" action="/admin/eventos/{{ ev.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="fora"><input name="razon" placeholder="Motivo" size="16"><input name="nome" placeholder="Nome" required size="8"><button>Fora do alcance</button></form>
+</section>{% else %}<p class="muted">Nenhum evento para esta semana. O agrupamento roda no sábado (ou: <code>python -m app.cli cluster</code>).</p>{% endfor %}
+{% endblock %}

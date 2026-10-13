@@ -100,6 +100,9 @@ DATA_GAPS = [
     {"pt": "WhatsApp, YouTube e rádio sem transcrição não entram na contagem. Boa parte da informação política no Brasil circula por esses canais; a cobertura medida aqui é a de texto publicado na web.",
      "es": "WhatsApp, YouTube y la radio sin transcripción no entran en el conteo. Buena parte de la información política en Brasil circula por esos canales; la cobertura medida aquí es la del texto publicado en la web.",
      "en": "WhatsApp, YouTube and untranscribed radio are not counted. Much political information in Brazil circulates through those channels; the coverage measured here is text published on the web."},
+    {"pt": "GZH e o portal da Band ainda não são recolhidos (sem feed ou sitemap utilizável). Alguns veículos publicam feeds com poucas entradas; a recolha a cada duas horas reduz, mas não elimina, a perda de artigos.",
+     "es": "GZH y el portal de Band todavía no se recolectan (sin feed ni sitemap utilizable). Algunos medios publican feeds con pocas entradas; la recolección cada dos horas reduce, pero no elimina, la pérdida de artículos.",
+     "en": "GZH and the Band portal are not yet collected (no usable feed or sitemap). Some outlets publish feeds with few entries; collecting every two hours reduces, but does not eliminate, missed articles."},
 ]
 
 CONTEXT = [
@@ -161,6 +164,8 @@ def seed_brasil(s: Session) -> m.Country:
                             fecha_inicializacion=START, contexto=CONTEXT, data_gaps=DATA_GAPS)
         s.add(country)
         s.flush()
+    if len(country.data_gaps or []) < len(DATA_GAPS):
+        country.data_gaps = DATA_GAPS
     if not s.scalars(select(m.Cleavage).where(m.Cleavage.country_id == "BR")).first():
         for slug, nombre, tipo, activo, orden, desc, poles in AXES:
             c = m.Cleavage(country_id="BR", slug=slug, nombre=nombre, tipo=tipo, activo=activo, orden=orden,

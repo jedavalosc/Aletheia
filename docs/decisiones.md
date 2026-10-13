@@ -69,3 +69,21 @@ Registro de las decisiones que el prompt dejó abiertas o que la implementación
 **D25. Mundo ficticio explícito.** Estado de Itaquara, ciudad de Porto Anil, medios nombrados con letras griegas, URLs en el dominio reservado `.invalid`, comentadores "A" y "B". Ninguna entidad puede confundirse con una real. Cada página lleva "Edição de demonstração — conteúdo fictício" y `noindex`.
 
 **D26. Contexto electoral.** Las fechas de la primera y segunda vuelta vienen del prompt y figuran en la configuración del país con la marca "a confirmar por el equipo con el calendario del TSE". No hay resultados ni candidatos en el código.
+
+## Fase 2: proceso agéntico (12 de octubre de 2026)
+
+**D27. Proceso agéntico con compuertas.** [A confirmar] Sin equipo local, cada etapa la ejecuta un agente; las reglas en código siguen decidiendo y el editor resuelve una cola de excepciones. Nivel de autonomía de partida: 1. Diseño completo en `docs/agentes.md`; enmienda reflejada en el encargo del proyecto (sección 14).
+
+**D28. Recolección solo de titular, resumen y enlace.** Los agentes nunca descargan ni guardan el cuerpo de los artículos: solo lo que el medio publica en su RSS o en su sitemap de Google News. Se respeta `robots.txt` con el agente de usuario `AletheiaNewsBot` y un máximo de una petición por segundo por dominio. Fuentes verificadas en `app/seed/feeds_br.json`: 20 de 22 medios; GZH y Band sin fuente utilizable, declarado como vacío.
+
+**D29. Recolección cada dos horas.** Varios RSS guardan solo las últimas 10 entradas (Poder360, Jovem Pan, Revista Oeste, Agência Brasil). Recolectar una vez por semana perdería casi todo su contenido y crearía falsos puntos ciegos. Corre en GitHub Actions; en un repositorio privado consume del cupo gratuito de minutos, por eso no es horaria.
+
+**D30. Agrupación léxica local, no embeddings.** [A confirmar] El encargo sugiere embeddings con `pgvector`. Kimi no ofrece API de embeddings y un modelo local no cabe en el servicio gratuito. Se usa TF-IDF sobre titular y resumen (pliegue de acentos, nombres propios con más peso) y aglomeración por enlace promedio, que resiste el encadenamiento que produce un mismo nombre en muchas noticias distintas durante una elección. Con datos de la semana del 5/10 separó bien eventos que compartían nombres. Revisar si la calidad cae con volúmenes mayores.
+
+**D31. El agente revisa cada grupo.** Una llamada al modelo por evento candidato: confirma que es un solo evento y retira los titulares que no corresponden, redacta un título provisional neutral (verificado contra la lista de términos cargados), asigna sección y decide el alcance temático con su razón. Sin clave, o al alcanzar el tope de gasto, se usan reglas deterministas. Prueba del 12/10: 15 llamadas, unos 18 s cada una con `kimi-k3`.
+
+**D32. Las columnas de opinión no forman eventos.** URLs de columnas, blogs, opinión y "vozes" se excluyen de la agrupación: encuadran hechos, no los reportan. Siguen en la base para el análisis de encuadre.
+
+**D33. Impacto = amplitud de la cobertura.** [A confirmar] El impacto provisional se calcula por la proporción de medios activos que cubren el evento y su dispersión regional. Mide atención, no importancia. Es una aproximación hasta que el editor (o un agente con criterios explícitos) lo ajuste; el panel lo dice.
+
+**D34. Precios del modelo.** El costo registrado usa los precios configurados (`AGENT_PRICE_*`, por defecto los del chat). Ajustarlos a la tarifa real de Kimi para que el tope por corrida (`AGENT_BUDGET_CENTS_PER_RUN`, 100 ¢) sea fiel.

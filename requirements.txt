@@ -5,6 +5,7 @@ alembic==1.20.0
 psycopg[binary]==3.3.6
 pgvector==0.5.0
 Jinja2==3.1.6
+feedparser==6.0.14
 anthropic==1.11.0
 pydantic>=2.8
 python-multipart>=0.0.9

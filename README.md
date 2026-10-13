@@ -150,10 +150,23 @@ tests/                 pruebas unitarias y de punta a punta
 scripts/               arranque, pipeline, auditoría de accesibilidad
 ```
 
-## Siguientes pasos (fase 2)
+## Fase 2: proceso agéntico
 
-1. Ingesta de 20–30 medios (RSS, sitemaps), respetando `robots.txt`, muros de pago y términos de uso; texto completo solo donde se permita.
-2. Embeddings con pgvector, agrupación en ventana de 7 días, extracción de afirmaciones atómicas y alineación entre artículos.
-3. Redacción restringida con modelo, condicionada a las afirmaciones seleccionadas y pasada por el verificador existente.
-4. Estimación de posiciones de medios con codificación humana de dos anotadores (provisional hasta entonces).
-5. Calibrar los umbrales de punto ciego (D8) y confirmar con el equipo del país los ejes, los colores excluidos y la tipografía de titulares (D22).
+Diseño en [`docs/agentes.md`](docs/agentes.md): los agentes proponen, el código decide y el editor resuelve una cola de excepciones. Nivel de autonomía de partida: 1.
+
+| Paso | Comando | Programado |
+|---|---|---|
+| 1. Recolección (RSS y sitemaps de noticias, 20 medios) | `python -m app.cli collect` | Cada dos horas, `.github/workflows/collect.yml` |
+| 2. Agrupación en eventos candidatos | `python -m app.cli cluster [--semana AAAA-MM-DD] [--sem-modelo]` | Sábado 03:00 BRT, dentro del pipeline semanal |
+
+En el panel: **Fila de exceções** (lo que las reglas no resuelven), **Eventos da semana** (confirmar, fusionar, retirar artículos, marcar fuera de alcance) y **Corridas dos agentes** (cada paso con modelo, versión de prompt, tokens y costo).
+
+**Secretos de GitHub necesarios** (Settings → Secrets and variables → Actions): `DATABASE_URL` (cadena de Neon) y `CHAT_API_KEY` (clave de Kimi; los agentes usan el mismo proveedor que el chat).
+
+## Siguientes pasos
+
+1. Paso 3: extracción de afirmaciones con verificación cruzada en un segundo proveedor.
+2. Paso 4: redacción restringida con el verificador existente.
+3. Paso 5: posición de medios por dos agentes anotadores, con muestra de control del editor.
+4. Página pública "Como esta edição foi feita".
+5. Calibrar umbrales con cuatro semanas de datos reales.

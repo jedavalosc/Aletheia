@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block main %}
+<h1>Fila de exceções</h1>
+<p class="muted">O que as regras em código não conseguem decidir. <a href="/admin/fila?estado=pendiente">Pendentes</a> · <a href="/admin/fila?estado=resuelto">Resolvidos</a> · <a href="/admin/fila?estado=descartado">Descartados</a></p>
+<table><thead><tr><th>Prioridade</th><th>Tipo</th><th>Alvo</th><th>Motivo</th><th>Decisão</th></tr></thead><tbody>
+{% for i in items %}<tr><td>{{ i.prioridad }}</td><td><span class="pill">{{ i.tipo }}</span><br><span class="muted">{{ i.creado_en.strftime('%d/%m %H:%M') }} · corrida {{ i.run_id }}</span></td>
+<td>{% if i.target_tipo == 'event' and events.get(i.target_id|int) %}{% set ev = events[i.target_id|int] %}<a href="/admin/eventos?semana={{ ev.semana_inicio.strftime('%Y-%m-%d') if ev.semana_inicio else '' }}#ev{{ ev.id }}">{{ ev.titulo_provisional }}</a>{% else %}{{ i.target_tipo }} {{ i.target_id }}{% endif %}</td>
+<td>{{ i.motivo }}{% if i.resolucion %}<br><span class="muted">Resolução: {{ i.resolucion }} ({{ i.resuelto_por }})</span>{% endif %}</td>
+<td><form method="post" action="/admin/fila/{{ i.id }}"><input type="hidden" name="csrf" value="{{ csrf }}">
+<select name="estado"><option value="resuelto">resolvido</option><option value="descartado">descartado</option><option value="pendiente">pendente</option></select>
+<input name="nome" placeholder="Nome" required size="10"><input name="resolucion" placeholder="Nota" size="18"><button>Salvar</button></form></td></tr>
+{% else %}<tr><td colspan="5" class="muted">Nada aqui.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

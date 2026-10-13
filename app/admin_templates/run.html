@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block main %}
+<h1>Corrida #{{ r.id }} · {{ r.tipo }} <span class="pill">{{ r.estado }}</span></h1>
+<p class="muted">{{ r.iniciado_en }} → {{ r.terminado_en or '…' }} · disparo: {{ r.disparado_por }} · nível {{ r.autonomy_level }} · custo {{ '%.3f'|format(r.costo_centavos) }}¢ de {{ '%.0f'|format(r.tope_centavos) }}¢</p>
+<pre style="white-space:pre-wrap;background:#fff;border:1px solid #D9D4CA;padding:8px">{{ r.resumen|tojson(indent=1) }}</pre>
+<table><thead><tr><th>Passo</th><th>Objetivo</th><th>Modelo · prompt</th><th>Tokens</th><th>¢</th><th>ms</th><th>Estado</th><th>Saída</th></tr></thead><tbody>
+{% for st in steps %}<tr><td>{{ st.agente }}</td><td>{{ st.objetivo }}</td><td>{{ st.modelo or '—' }}{% if st.prompt_version %} · {{ st.prompt_version }}{% endif %}</td><td>{{ st.tokens_in }}/{{ st.tokens_out }}</td>
+<td>{{ '%.3f'|format(st.costo_centavos) }}</td><td>{{ st.duracion_ms }}</td><td class="{{ 'ok' if st.estado == 'ok' else 'bad' }}">{{ st.estado }}{% if st.error %}<br><span class="muted">{{ st.error|truncate(160) }}</span>{% endif %}</td>
+<td><details><summary class="muted">ver</summary><pre style="white-space:pre-wrap;font-size:.75rem">{{ st.salida|tojson(indent=1) }}</pre></details></td></tr>{% endfor %}</tbody></table>
+{% endblock %}
