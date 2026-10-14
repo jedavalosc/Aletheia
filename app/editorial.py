@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from . import models as m
 from .config import LANGS
 from .rules.loaded_terms import Term
+from .rules.language import allowed_numbers
 from .rules.verifier import ClaimRef, verify_brief
 
 MIN_EVENTS, MAX_EVENTS = 6, 12
@@ -31,7 +32,14 @@ def claim_refs(s: Session, event_ids: list[int] | None = None) -> dict[str, Clai
     q = select(m.Claim)
     if event_ids is not None:
         q = q.where(m.Claim.event_id.in_(event_ids))
-    return {c.codigo: ClaimRef(c.codigo, c.event_id, c.modo, c.medida, c.valor) for c in s.scalars(q)}
+    return {c.codigo: claim_ref(c) for c in s.scalars(q)}
+
+
+def claim_ref(c: m.Claim) -> ClaimRef:
+    nums = allowed_numbers(c.texto_normalizado, "pt")
+    if c.valor is not None:
+        nums.add(float(c.valor))
+    return ClaimRef(c.codigo, c.event_id, c.modo, c.medida, c.valor, c.estado or "aceptada", frozenset(nums))
 
 
 def translation_of(s: Session, tipo: str, sid: int, campo: str, lang: str) -> m.Translation | None:

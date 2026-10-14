@@ -65,7 +65,8 @@ El alojamiento puede seguir gratuito. El costo nuevo es el modelo, sobre todo la
 | Recolección (paso 1) | Hecho: 20 medios, cada dos horas (D28, D29) |
 | Agrupación en eventos (paso 2) | Hecho: TF-IDF + enlace promedio + revisión por agente (D30, D31) |
 | Extracción y verificación cruzada de afirmaciones (paso 3) | Hecho: `kimi-k3` extrae, compuertas en código, `kimi-k2.6` verifica (D35–D43). Semana del 5/10: 67 aceptadas, 11 en revisión, desacuerdo 15 %, 8 min |
-| Redacción restringida (paso 4) | Pendiente |
+| Redacción restringida (paso 4) | Hecho: edición armada por impacto, redactor + verificador en código + verificador de fidelidad en otro modelo, hasta dos reparaciones, traducción ES/EN verificada (D44–D50) |
 | Posición de medios por anotadores modelo (paso 5) | Pendiente |
 | Nivel de autonomía en la metodología pública | Hecho |
-| Revisor adversarial, literatura académica, página de transparencia | Pendiente |
+| Revisor local multidisciplinar (sustituye al revisor adversarial) | Diseñado: `docs/revisor-local.md`, sin implementar |
+| Literatura académica, página de transparencia | Pendiente |

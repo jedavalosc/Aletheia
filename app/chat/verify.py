@@ -64,7 +64,8 @@ def _claim_numbers(corpus: Corpus, cids: list[str]) -> set[float]:
 
 def verify_answer(corpus: Corpus, segments: list[dict], terms: list[Term], lang: str, factual_mode: bool) -> ChatCheck:
     issues: list[str] = []
-    refs = {k: ClaimRef(k, v["event_id"], v["modo"], v["medida"], v["valor"]) for k, v in corpus.claims.items()}
+    refs = {k: ClaimRef(k, v["event_id"], v["modo"], v["medida"], v["valor"],
+                        numeros=frozenset(v.get("numeros") or [])) for k, v in corpus.claims.items()}
     n_fact_sent = n_fact_cited = 0
     if not segments:
         issues.append("resposta vazia")

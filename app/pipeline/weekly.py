@@ -11,8 +11,8 @@ Stages:  ingest -> normalise/dedupe -> embed+entities -> cluster (7-day window)
          -> translation -> static site on approval.
 Implemented: collection (step 1), grouping into candidate events (step 2),
 the stages that run on loaded events (selection, coverage, blind spots,
-framing, verifier, standard visuals). claim extraction with cross-check (step 3).
-Drafting (step 4) is next; see docs/agentes.md.
+framing, verifier, standard visuals), claim extraction with cross-check (step 3),
+edition assembly and constrained drafting in three languages (step 4). See docs/agentes.md.
 """
 from __future__ import annotations
 
@@ -51,6 +51,26 @@ def week_window(now: datetime) -> dict | None:
             "publicacion_prevista": monday + timedelta(days=7, hours=6)}
 
 
+def window_for_monday(monday) -> dict:
+    """Edition window of the week starting on `monday` (a date)."""
+    start = datetime.combine(monday, datetime.min.time(), BRT)
+    return week_window(start + timedelta(days=5))
+
+
+def ensure_edition(s, country: str, win: dict) -> m.Edition:
+    ed = s.scalars(select(m.Edition).where(m.Edition.country_id == country, m.Edition.semana_inicio == win["semana_inicio"],
+                                           m.Edition.es_demo.is_(False))).first()
+    if ed is not None:
+        return ed
+    last = s.scalars(select(m.Edition).where(m.Edition.country_id == country, m.Edition.es_demo.is_(False))
+                     .order_by(m.Edition.numero.desc())).first()
+    ed = m.Edition(country_id=country, numero=(last.numero + 1) if last else 1, estado="borrador", **win)
+    s.add(ed)
+    s.flush()
+    log.info("Edição n.º %s criada em rascunho.", ed.numero)
+    return ed
+
+
 def ingest(window: dict) -> dict:
     """Step 1 (collection) runs every two hours during the week; one more pass here
     catches anything published just before the cutoff."""
@@ -71,6 +91,16 @@ def extract(window: dict) -> dict:
     from ..agents.extract import extract_week
     with session() as s:
         return extract_week(s, get_settings().country_code, window["semana_inicio"].date(), disparado_por="pipeline")
+
+
+def draft(window: dict) -> dict:
+    """Step 4: assemble the edition and draft each chronicle (agent + code verifier + checker + translation)."""
+    from ..agents.draft import draft_edition
+    with session() as s:
+        ed = s.scalars(select(m.Edition).where(m.Edition.country_id == get_settings().country_code,
+                                               m.Edition.semana_inicio == window["semana_inicio"],
+                                               m.Edition.es_demo.is_(False))).first()
+        return draft_edition(s, ed, disparado_por="pipeline")
 
 
 def run(force: bool = False, now: datetime | None = None) -> int:
@@ -94,15 +124,11 @@ def run(force: bool = False, now: datetime | None = None) -> int:
             log.info("Edição n.º %s já aprovada; nada a recalcular.", ed.numero)
             return 0
         if ed is None:
-            last = s.scalars(select(m.Edition).where(m.Edition.country_id == country, m.Edition.es_demo.is_(False))
-                             .order_by(m.Edition.numero.desc())).first()
-            ed = m.Edition(country_id=country, numero=(last.numero + 1) if last else 1, estado="borrador", **win)
-            s.add(ed)
-            s.flush()
-            log.info("Edição n.º %s criada em rascunho.", ed.numero)
+            ed = ensure_edition(s, country, win)
     log.info("Recoleção: %s", ingest(win))
     log.info("Agrupamento: %s", group(win))
     log.info("Afirmações: %s", extract(win))
+    log.info("Redação: %s", draft(win))
     with session() as s:
         ed = s.scalars(select(m.Edition).where(m.Edition.country_id == country,
                                                m.Edition.semana_inicio == win["semana_inicio"],
@@ -112,8 +138,10 @@ def run(force: bool = False, now: datetime | None = None) -> int:
             for b in s.scalars(select(m.NeutralBrief).where(m.NeutralBrief.event_id == ee.event_id,
                                                             m.NeutralBrief.edition_id == ed.id)):
                 b.verificacion = verify_brief_all_languages(s, b)
-                if b.estado != "aprobada":
-                    b.estado = "verificada" if all(r["ok"] for r in b.verificacion.values()) else "rechazada"
+                # The code verifier can only downgrade here: a chronicle the drafting run rejected
+                # (failed faithfulness check or title) stays rejected until the editor acts.
+                if b.estado != "aprobada" and not all(r["ok"] for r in b.verificacion.values()):
+                    b.estado = "rechazada"
         build_standard_visuals(s, ed)
         n_art = len(set(s.scalars(select(m.Article.outlet_id).where(m.Article.fecha_pub >= ed.semana_inicio,
                                                                    m.Article.fecha_pub <= ed.corte_ingesta))))

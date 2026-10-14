@@ -7,13 +7,17 @@ Rejects:
   * a sentence that cites an attributed claim without an attribution marker;
   * a sentence citing several sources of one disputed figure but not giving
     each source's value (i.e. averaging or collapsing them);
-  * a sentence citing an excluded claim.
+  * a sentence citing an excluded claim;
+  * a sentence citing a claim the agents did not accept (step 3);
+  * a number that appears in none of the cited claims (step 4);
+  * a certainty formula ("sem dúvida", "é evidente que");
+  * an attributive verb the style guide rules out (alegou, revelou, rebateu...).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .language import has_attribution, numbers_in
+from .language import certainty_hits, discouraged_verbs, has_attribution, numbers_in
 from .loaded_terms import Term, violations
 
 
@@ -24,6 +28,14 @@ class ClaimRef:
     modo: str | None
     medida: str | None = None
     valor: float | None = None
+    estado: str = "aceptada"
+    numeros: frozenset = frozenset()  # numbers in the claim text (pt convention) and its value
+
+
+def number_supported(n: float, allowed: set[float]) -> bool:
+    """A number is supported if it equals an allowed one, or differs by a factor of 1,000
+    (2,3 bilhões = 2.300 millones = 2.3 billion)."""
+    return any(abs(n - a) < 1e-6 or abs(n - a * 1000) < 1e-6 or abs(n * 1000 - a) < 1e-6 for a in allowed)
 
 
 @dataclass
@@ -58,6 +70,8 @@ def verify_sentence(orden: int, texto: str, claim_ids: list[str], event_id: int 
             issues.append(SentenceIssue(orden, "claim_de_otro_evento", f"{cid} pertenece a otro evento"))
         if ref.modo == "excluido":
             issues.append(SentenceIssue(orden, "claim_excluido", f"{cid} fue excluido por la regla de selección"))
+        if ref.estado != "aceptada":
+            issues.append(SentenceIssue(orden, "claim_no_aceptado", f"{cid} no fue aceptado por los agentes ({ref.estado})"))
         refs.append(ref)
     attributed = has_attribution(texto, lang)
     if any(r.modo == "atribuido" for r in refs) and not attributed:
@@ -65,6 +79,18 @@ def verify_sentence(orden: int, texto: str, claim_ids: list[str], event_id: int 
                                     "Cita una afirmación de un solo polo sin atribuirla"))
     for h in violations(texto, terms, lang):
         issues.append(SentenceIssue(orden, "termino_cargado", f"'{h.termino}' sin atribución ({h.motivo})"))
+    for p in certainty_hits(texto, lang):
+        issues.append(SentenceIssue(orden, "formula_certeza", f"Fórmula de certeza: '{p}'"))
+    for vb in discouraged_verbs(texto, lang):
+        issues.append(SentenceIssue(orden, "verbo_desaconsejado", f"Verbo atributivo desaconsejado: '{vb}' (usar disse/afirmou)"))
+    if refs:
+        allowed: set[float] = set()
+        for r in refs:
+            allowed |= set(r.numeros)
+        loose = sorted(n for n in numbers_in(texto, lang) if not number_supported(n, allowed))
+        if loose:
+            issues.append(SentenceIssue(orden, "numero_sin_respaldo",
+                                        f"Número(s) {', '.join(f'{n:g}' for n in loose)} ausente(s) de los claims citados"))
     # Disputed figures: same measure, different values -> each value must appear.
     by_measure: dict[str, list[ClaimRef]] = {}
     for r in refs:

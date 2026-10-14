@@ -10,8 +10,10 @@ TERMS = [Term("invasão", r"invas(?:ão|ões|or|ores)|invadi(?:u|do|da)", "pt"),
 CLAIMS = {
     "c-1": ClaimRef("c-1", 1, "llano"),
     "c-2": ClaimRef("c-2", 1, "atribuido"),
-    "c-3": ClaimRef("c-3", 1, "atribuido", "famílias", 210),
-    "c-4": ClaimRef("c-4", 1, "atribuido", "famílias", 140),
+    "c-3": ClaimRef("c-3", 1, "atribuido", "famílias", 210, numeros=frozenset({210.0})),
+    "c-4": ClaimRef("c-4", 1, "atribuido", "famílias", 140, numeros=frozenset({140.0})),
+    "c-5": ClaimRef("c-5", 1, "llano", numeros=frozenset({2.3, 2026.0})),
+    "c-6": ClaimRef("c-6", 1, "llano", estado="en_revision"),
     "c-9": ClaimRef("c-9", 2, "llano"),
 }
 
@@ -53,6 +55,23 @@ def test_disputed_figures_never_collapsed():
     r = v("Cerca de 175 famílias vivem no prédio, segundo as fontes.", ["c-3", "c-4"])
     assert "cifra_colapsada" in codes(r)
     assert v("O movimento informou 210 famílias; a prefeitura registrou 140.", ["c-3", "c-4"]).ok
+
+
+def test_numbers_must_come_from_cited_claims():
+    assert "numero_sin_respaldo" in codes(v("O orçamento é de R$ 2,3 bilhões para 2027.", ["c-5"]))
+    assert v("O orçamento é de R$ 2,3 bilhões para 2026.", ["c-5"]).ok
+    assert v("El presupuesto es de 2.300 millones de reales para 2026.", ["c-5"], "es").ok
+    assert v("The budget is 2.3 billion reais for 2026.", ["c-5"], "en").ok
+
+
+def test_only_accepted_claims_and_no_certainty_formulas():
+    assert "claim_no_aceptado" in codes(v("O prédio foi esvaziado.", ["c-6"]))
+    assert "formula_certeza" in codes(v("Sem dúvida o prédio foi esvaziado.", ["c-1"]))
+
+
+def test_present_tense_attribution_in_headlines():
+    assert has_attribution("Lula diz que não aceitará intromissão", "pt")
+    assert has_attribution("Campanha de Lula acusa a Meta", "pt")
 
 
 def test_number_parsing_by_language():

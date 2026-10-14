@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..editorial import claim_ref
+
 from .. import models as m
 from ..analytics.visuals import texts_for
 from ..config import LANGS
@@ -128,10 +130,11 @@ def build_corpus(s: Session, ed: m.Edition) -> Corpus:
                 omitted += [k for k in codes if k not in omitted]
         events[ev.slug] = {"titulo": title, "id": ev.id, "omitted": omitted}
         titles_line.append(title)
-        for c in s.scalars(select(m.Claim).where(m.Claim.event_id == ev.id)):
+        for c in s.scalars(select(m.Claim).where(m.Claim.event_id == ev.id, m.Claim.estado == "aceptada")):
             texts = {lang: tr.get("claim", c.id, "texto", lang, c.texto_normalizado) for lang in LANGS}
             claims[c.codigo] = {"modo": c.modo, "medida": c.medida, "valor": c.valor, "event_id": ev.id, "event": ev.slug,
-                                "texts": texts, "atribucion": c.atribucion}
+                                "texts": texts, "atribucion": c.atribucion,
+                                "numeros": sorted(claim_ref(c).numeros)}
             outlets = sorted({sp.article.outlet_id for sp in c.supports})
             text = {}
             for lang in LANGS:

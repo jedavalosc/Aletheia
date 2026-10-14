@@ -91,6 +91,8 @@ class Settings:
                                       or os.environ.get("CHAT_API_KEY") or os.environ.get("ANTHROPIC_API_KEY") or None)
     agent_max_tokens: int = field(default_factory=lambda: _int("AGENT_MAX_TOKENS", 4000))
     agent_budget_cents_per_run: int = field(default_factory=lambda: _int("AGENT_BUDGET_CENTS_PER_RUN", 100))
+    # Drafting makes ~5 calls per event (draft, faithfulness check, repairs, two translations).
+    agent_budget_cents_draft: int = field(default_factory=lambda: _int("AGENT_BUDGET_CENTS_DRAFT", 300))
     agent_price_in_cents_per_mtok: int = field(default_factory=lambda: _int("AGENT_PRICE_IN_CENTS_PER_MTOK",
                                                                             _int("CHAT_PRICE_IN_CENTS_PER_MTOK", 300)))
     agent_price_out_cents_per_mtok: int = field(default_factory=lambda: _int("AGENT_PRICE_OUT_CENTS_PER_MTOK",

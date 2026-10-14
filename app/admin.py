@@ -9,7 +9,7 @@ import hmac
 import secrets
 from datetime import date
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -178,6 +178,63 @@ def flag_state(flag_id: int, ed_id: int = Form(...), estado: str = Form(...), cs
         f = s.get(m.BlindspotFlag, flag_id) or _404()
         f.estado = estado
         return _back(f"/admin/edicao/{ed_id}", "Bandeira atualizada.")
+
+
+def _redraft_job(ed_id: int, ev_id: int, instruction: str | None, user: str) -> None:
+    from .agents.draft import draft_edition
+    with session() as s:
+        draft_edition(s, s.get(m.Edition, ed_id), [ev_id], redo=True, instruction=instruction or None,
+                      disparado_por=f"editor:{user}")
+
+
+@router.post("/evento/{ev_id}/redigir")
+def redraft(ev_id: int, background: BackgroundTasks, ed_id: int = Form(...), instrucao: str = Form(""),
+            csrf: str = Form(...), user: str = Depends(editor)):
+    """Draft the chronicle again (new version), optionally with an editor instruction. Runs in the background:
+    the drafter, checker and translator take one to two minutes."""
+    check_csrf(user, csrf)
+    if not get_settings().agent_api_key:
+        return _back(f"/admin/edicao/{ed_id}", "Sem chave de modelo configurada (AGENT_API_KEY ou CHAT_API_KEY).")
+    background.add_task(_redraft_job, ed_id, ev_id, instrucao.strip()[:1000], user)
+    return _back(f"/admin/edicao/{ed_id}", "Redação iniciada: recarregue a página em dois minutos (ver Corridas).")
+
+
+def _retranslate_job(brief_id: int, orden: int, user: str) -> None:
+    from .agents.draft import retranslate_sentence
+    with session() as s:
+        b = s.get(m.NeutralBrief, brief_id)
+        retranslate_sentence(s, b, orden, disparado_por=f"editor:{user}")
+        b.verificacion = verify_brief_all_languages(s, b)
+        b.estado = "verificada" if all(r["ok"] for r in b.verificacion.values()) else "rechazada"
+
+
+@router.post("/oracao/{sent_id}/editar")
+def edit_sentence(sent_id: int, background: BackgroundTasks, texto: str = Form(...), claim_ids: str = Form(...),
+                  nome: str = Form(...), csrf: str = Form(...), user: str = Depends(editor)):
+    """The editor rewrites one Portuguese sentence. Its machine translations are discarded and redone; the
+    chronicle is verified again and needs a new approval."""
+    check_csrf(user, csrf)
+    with session() as s:
+        st = s.get(m.BriefSentence, sent_id) or _404()
+        b = s.get(m.NeutralBrief, st.brief_id)
+        if b.estado == "aprobada":
+            return _back(f"/admin/edicao/{b.edition_id}", "Crônica aprovada: redija uma nova versão para alterá-la.")
+        old = st.texto
+        st.texto = texto.strip()
+        st.claim_ids = [c.strip() for c in claim_ids.replace(";", ",").split(",") if c.strip()]
+        for tr in s.scalars(select(m.Translation).where(m.Translation.source_tipo == "brief_sentence",
+                                                        m.Translation.source_id == st.id)):
+            s.delete(tr)
+        s.add(m.HumanReview(target_tipo="brief", target_id=b.id, revisor=nome.strip(), decision="cambios",
+                            comentarios=f"Oração {st.orden} editada. Antes: {old}"))
+        s.flush()
+        b.verificacion = verify_brief_all_languages(s, b)
+        b.estado = "rechazada"  # until translations are redone and verified
+        ed_id, orden, bid = b.edition_id, st.orden, b.id
+    if get_settings().agent_api_key:
+        background.add_task(_retranslate_job, bid, orden, user)
+        return _back(f"/admin/edicao/{ed_id}", "Oração editada; tradução em andamento (recarregue em um minuto).")
+    return _back(f"/admin/edicao/{ed_id}", "Oração editada. Sem chave de modelo: traduza no bloco Traduções.")
 
 
 @router.post("/artigo/reatribuir")

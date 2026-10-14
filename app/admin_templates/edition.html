@@ -8,14 +8,22 @@
 {% if ev.razon_inclusion_confirmada_por %}<span class="ok">Confirmada por {{ ev.razon_inclusion_confirmada_por }}</span>{% else %}
 <form class="inline" method="post" action="/admin/evento/{{ ev.id }}/confirmar-inclusao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ed_id" value="{{ ed.id }}"><input name="nome" placeholder="Nome do editor" required><button>Confirmar razão de inclusão</button></form>{% endif %}</p>{% endif %}
 {% if b %}<h3>Crônica v{{ b.version }} — estado: {{ b.estado }}</h3>
-<ol>{% for st in b.sentences %}<li>{{ st.texto }} <span class="muted">[{{ st.claim_ids|join(', ') }}]</span></li>{% endfor %}</ol>
+<p class="muted">Modelo: {{ b.modelo }} · prompt {{ b.prompt_version }}</p>
+<p><b>{{ b.titulo }}</b></p>
+<ol start="0">{% for st in b.sentences %}<li>{% if b.estado != 'aprobada' %}<details><summary>{{ st.texto }} <span class="muted">[{{ st.claim_ids|join(', ') }}]</span></summary>
+<form method="post" action="/admin/oracao/{{ st.id }}/editar"><input type="hidden" name="csrf" value="{{ csrf }}"><textarea name="texto" rows="2">{{ st.texto }}</textarea>
+<input name="claim_ids" value="{{ st.claim_ids|join(', ') }}" placeholder="códigos das afirmações"><input name="nome" placeholder="Nome do editor" required><button>Salvar oração</button></form></details>
+{% else %}{{ st.texto }} <span class="muted">[{{ st.claim_ids|join(', ') }}]</span>{% endif %}</li>{% endfor %}</ol>
 <table><thead><tr><th>Língua</th><th>Verificação</th></tr></thead><tbody>{% for lang, r in (b.verificacion or {}).items() %}<tr><td>{{ lang }}</td><td>{% if r.ok %}<span class="ok">ok</span>{% else %}{% for i in r.issues %}<div class="bad">[{{ i.orden }}] {{ i.detalle }}</div>{% endfor %}{% endif %}</td></tr>{% endfor %}</tbody></table>
 <form class="inline" method="post" action="/admin/cronica/{{ b.id }}/verificar"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Refazer verificação</button></form>
+{% endif %}
+<form class="inline" method="post" action="/admin/evento/{{ ev.id }}/redigir"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ed_id" value="{{ ed.id }}"><input name="instrucao" placeholder="Instrução ao redator (opcional)" size="40"><button>{% if b %}Redigir nova versão{% else %}Redigir crônica{% endif %}</button></form>
+{% if b %}
 {% if b.estado != 'aprobada' %}<form class="inline" method="post" action="/admin/cronica/{{ b.id }}/aprovar"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="nome" placeholder="Nome do editor" required><input name="comentarios" placeholder="Comentários"><button>Aprovar crônica</button></form>
 <form class="inline" method="post" action="/admin/cronica/{{ b.id }}/rejeitar"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="nome" placeholder="Nome do editor" required><input name="comentarios" placeholder="Motivo" required><button>Devolver</button></form>{% endif %}
 {% endif %}
-<h3>Afirmações</h3><table><thead><tr><th>Código</th><th>Texto</th><th>Modo</th><th>Apoios</th></tr></thead><tbody>
-{% for c in e.claims %}<tr><td>{{ c.codigo }}</td><td>{{ c.texto_normalizado }}</td><td>{{ c.modo }}</td><td>{{ c.supports|length }}</td></tr>{% endfor %}</tbody></table>
+<h3>Afirmações</h3><table><thead><tr><th>Código</th><th>Texto</th><th>Estado</th><th>Modo</th><th>Apoios</th></tr></thead><tbody>
+{% for c in e.claims %}<tr{% if c.estado != 'aceptada' %} class="muted"{% endif %}><td>{{ c.codigo }}</td><td>{{ c.texto_normalizado }}</td><td>{{ c.estado }}</td><td>{{ c.modo }}</td><td>{{ c.supports|length }}</td></tr>{% endfor %}</tbody></table>
 <h3>Bandeiras de ponto cego</h3>{% for f, p in e.flags %}<form class="inline" method="post" action="/admin/bandeira/{{ f.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ed_id" value="{{ ed.id }}">{{ f.subject }} · cobertura baixa em {{ p.etiqueta }} · diferença {{ (f.diferencia_cobertura*100)|round }} p.p. · <select name="estado">{% for s in ['provisional','confirmada','descartada'] %}<option{% if s == f.estado %} selected{% endif %}>{{ s }}</option>{% endfor %}</select><button>Salvar</button></form><br>{% else %}<p class="muted">Nenhuma.</p>{% endfor %}
 <h3>Peças visuais</h3><ul>{% for v in e.visuals %}<li>{{ v.tipo }} · nível {{ v.nivel }} · {{ v.estado }}</li>{% endfor %}</ul>
 <h3>Traduções</h3><details><summary>{{ e.translations|length }} orações traduzidas</summary>

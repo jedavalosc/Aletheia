@@ -33,6 +33,12 @@ def main(argv=None):
     ex.add_argument("--max-eventos", type=int, default=15)
     ex.add_argument("--refazer", action="store_true", help="Refaz eventos já processados (sem decisões do editor)")
     ex.add_argument("--disparado-por", default="cli")
+    dr = sub.add_parser("draft", help="Passo 4: monta a edição da semana e redige as crônicas (PT, ES, EN)")
+    dr.add_argument("--semana", default=None, help="Segunda-feira da semana (AAAA-MM-DD); padrão: semana atual")
+    dr.add_argument("--eventos", type=int, nargs="*", default=None, help="Só estes eventos (ids)")
+    dr.add_argument("--refazer", action="store_true", help="Redige de novo mesmo com crônica existente")
+    dr.add_argument("--instrucao", default=None, help="Instrução do editor para o redator")
+    dr.add_argument("--disparado-por", default="cli")
     sub.add_parser("purge-chats", help="Apaga conversas com retenção vencida")
     sub.add_parser("status", help="Resumo das edições, verificação e bandeiras")
     ev = sub.add_parser("eval-chat", help="Roda o conjunto de avaliação do chat")
@@ -80,6 +86,17 @@ def main(argv=None):
         with session() as s:
             wk = date.fromisoformat(a.semana) if a.semana else None
             print(json.dumps(extract_week(s, get_settings().country_code, wk, a.max_eventos, a.refazer, a.disparado_por),
+                             ensure_ascii=False, default=str))
+    elif a.cmd == "draft":
+        from datetime import date
+        from .agents.cluster import current_monday
+        from .agents.draft import draft_edition
+        from .pipeline.weekly import ensure_edition, window_for_monday
+        with session() as s:
+            wk = date.fromisoformat(a.semana) if a.semana else current_monday()
+            ed = ensure_edition(s, get_settings().country_code, window_for_monday(wk))
+            s.commit()
+            print(json.dumps(draft_edition(s, ed, a.eventos, a.refazer, a.instrucao, a.disparado_por),
                              ensure_ascii=False, default=str))
     elif a.cmd == "build-site":
         from .site.build import build_site

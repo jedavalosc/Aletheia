@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from .language import numbers_in
+from .language import discouraged_verbs, numbers_in
 from .loaded_terms import Term, violations
 
 TIPOS = {"quien", "que", "cuando", "donde", "cifra", "cita"}
@@ -54,4 +54,6 @@ def claim_problems(c: dict, terms: list[Term], lang: str = "pt") -> list[str]:
         out.append("cifra sem valor ou medida")
     for h in violations(texto, terms, lang):
         out.append(f"termo carregado sem atribuição: {h.termino}")
+    for v in discouraged_verbs(texto, lang):
+        out.append(f"verbo atributivo desaconselhado: {v} (usar disse/afirmou)")
     return out

@@ -15,7 +15,8 @@ on:
 jobs:
   pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Collection + grouping + claims (~10 min) + drafting and translation (~1.5 min per event).
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,6 +34,7 @@ jobs:
           CHAT_MODEL: kimi-k3
           CHAT_API_KEY: ${{ secrets.CHAT_API_KEY }}
           AGENT_BUDGET_CENTS_PER_RUN: "100"
+          AGENT_BUDGET_CENTS_DRAFT: "300"
           # Claim checker: a different model (D36). Reasoning mode off for both (D40).
           VERIFIER_MODEL: kimi-k2.6
           AGENT_THINKING: disabled

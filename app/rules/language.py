@@ -8,14 +8,23 @@ ATTRIBUTION = {
     "pt": [r"segundo", r"de acordo com", r"conforme", r"disse", r"disseram", r"afirmou", r"afirmaram",
            r"informou", r"informaram", r"relatou", r"relataram", r"registrou", r"estimou", r"declarou",
            r"declararam", r"argumentou", r"argumentam", r"sustentou", r"sustentam", r"reportou", r"reportaram",
-           r"denunciou", r"acusou", r"admitiu", r"na avaliação de", r"contabilizou", r"indicou", r"apontou", r"calculou"],
+           r"denunciou", r"acusou", r"admitiu", r"na avaliação de", r"contabilizou", r"indicou", r"apontou", r"calculou",
+           # present tense, used in headlines and for ongoing statements
+           r"diz", r"dizem", r"afirma", r"afirmam", r"informa", r"informam", r"declara", r"declaram", r"relata",
+           r"relatam", r"registra", r"estima", r"estimam", r"aponta", r"apontam", r"indica", r"indicam", r"acusa",
+           r"dizem veículos", r"segundo veículos", r"avalia", r"avaliou", r"avaliam", r"avaliaram",
+           r"ouvido pelo", r"ouvida pelo", r"ouvidos pelo", r"ouvido pela", r"ouvida pela"],
     "es": [r"según", r"de acuerdo con", r"conforme a", r"dijo", r"dijeron", r"afirmó", r"afirmaron",
            r"informó", r"informaron", r"relató", r"registró", r"estimó", r"declaró", r"declararon",
            r"argumentó", r"sostuvo", r"sostienen", r"reportó", r"reportaron", r"denunció", r"acusó", r"admitió",
-           r"contabilizó", r"indicó", r"señaló", r"calculó"],
+           r"contabilizó", r"indicó", r"señaló", r"calculó",
+           r"dice", r"dicen", r"afirma", r"afirman", r"informa", r"informan", r"declara", r"estima", r"señala",
+           r"indica", r"acusa", r"evalúa", r"evaluó", r"consultado por"],
     "en": [r"according to", r"said", r"says", r"stated", r"reported", r"estimated", r"declared",
            r"argued", r"argue", r"contended", r"maintain", r"recorded", r"denounced", r"accused", r"admitted",
-           r"found", r"counted", r"calculated"],
+           r"found", r"counted", r"calculated",
+           r"reports", r"estimates", r"accuses", r"states", r"assessed", r"assesses",
+           r"interviewed by"],
 }
 
 # Verbs that carry meaning: allowed only when they describe the act exactly.
@@ -62,3 +71,37 @@ def numbers_in(text: str, lang: str = "pt") -> set[float]:
         except ValueError:
             continue
     return out
+
+
+def allowed_numbers(text: str, lang: str = "pt") -> set[float]:
+    """Numbers a translation or paraphrase of `text` may contain: the parsed values, plus digit runs
+    glued to units or ordinals (6h, 1º, 3ª) and the 12-hour form of 24-hour times (22h -> 10 p.m.)."""
+    out = set(numbers_in(text, lang))
+    for mt in re.finditer(r"\d+", text):
+        out.add(float(mt.group(0)))
+    for mt in re.finditer(r"(?<!\d)(\d{1,2})\s?h", text):
+        h = int(mt.group(1))
+        if 13 <= h <= 23:
+            out.add(float(h - 12))
+    return out
+
+
+# Attributive verbs the style guide rules out (they suggest falsehood, secrecy or aggression). Outside quotes only.
+DISCOURAGED_VERBS = {
+    "pt": ["alegou", "alegaram", "alega", "alegam", "revelou", "revelaram", "disparou", "rebateu", "rebateram",
+           "atacou", "atacaram", "detonou", "confessou", "confessaram"],
+    "es": ["alegó", "alegaron", "reveló", "revelaron", "disparó", "arremetió", "fustigó", "atacó", "confesó"],
+    "en": ["claimed", "claims", "slammed", "blasted", "lashed out", "revealed", "confessed"],
+}
+
+
+def discouraged_verbs(text: str, lang: str) -> list[str]:
+    spans = quoted_spans(text)
+    low = text.lower()
+    hits = []
+    for v in DISCOURAGED_VERBS.get(lang, []):
+        for mt in re.finditer(r"(?<!\w)" + re.escape(v) + r"(?!\w)", low):
+            if not any(a <= mt.start() < b for a, b in spans):
+                hits.append(v)
+                break
+    return hits
