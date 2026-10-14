@@ -41,6 +41,10 @@ def main(argv=None):
     dr.add_argument("--disparado-por", default="cli")
     sub.add_parser("purge-chats", help="Apaga conversas com retenção vencida")
     sub.add_parser("status", help="Resumo das edições, verificação e bandeiras")
+    bp = sub.add_parser("build-panel", help="Gera o painel didático (handoff) e verifica registro × código")
+    bp.add_argument("--out", default=str(ROOT / "build" / "panel" / "index.html"))
+    bp.add_argument("--check", action="store_true", help="Falha se registro, anotações e código divergirem")
+    bp.add_argument("--sem-dados", action="store_true", help="Não consulta a base (só o repositório)")
     ev = sub.add_parser("eval-chat", help="Roda o conjunto de avaliação do chat")
     ev.add_argument("--out", default=str(ROOT / "build" / "eval"))
     a = ap.parse_args(argv)
@@ -112,6 +116,14 @@ def main(argv=None):
         from .status import status
         with session() as s:
             print(json.dumps(status(s), ensure_ascii=False, indent=2, default=str))
+    elif a.cmd == "build-panel":
+        from .panel.build import build_panel
+        _, problems = build_panel(a.out, with_live=not a.sem_dados)
+        print(f"Painel gerado em {a.out}")
+        for p in problems:
+            print("  ✕", p)
+        if a.check and problems:
+            sys.exit(1)
     elif a.cmd == "eval-chat":
         from evals.run_eval import run
         sys.exit(run(a.out))
