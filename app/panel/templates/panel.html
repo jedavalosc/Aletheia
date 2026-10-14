@@ -1,0 +1,653 @@
+{%- macro t(o) -%}
+{%- if o is mapping -%}
+<span class="i18n" data-l="es">{{ o.es }}</span>{% if o.en %}<span class="i18n" data-l="en">{{ o.en }}</span>{% else %}<span class="i18n" data-l="en">{{ o.es }} <em class="untr">(untranslated)</em></span>{% endif %}
+{%- elif o -%}{{ o }}{%- endif -%}
+{%- endmacro -%}
+{%- macro u(k) -%}{{ t(ui[k]) }}{%- endmacro -%}
+{%- macro code(l) -%}
+{%- if l and l.ok -%}<a class="code" href="{{ l.url }}" target="_blank" rel="noopener">{{ l.label }}{% if l.line %}<span class="ln">:{{ l.line }}</span>{% endif %}</a>
+{%- elif l -%}<span class="code broken" title="{{ l.why }}">{{ l.label }} ✕</span>{%- endif -%}
+{%- endmacro -%}
+{%- macro spec(items) -%}
+{%- for s in items %}{% if s.prose %}<span class="specref">{{ s.label }}</span>{% else %}{{ code(s) }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor -%}
+{%- endmacro -%}
+{%- macro status(st) -%}<span class="st {{ st }}">{{ u(st) }}</span>{%- endmacro -%}
+{%- macro who(e) -%}<span class="who">{{ u(e) }}</span>{%- endmacro -%}
+{%- macro foot(view) -%}
+<p class="vfoot"><span class="i18n" data-l="es">Generado del commit</span><span class="i18n" data-l="en">Generated from commit</span> <a href="{{ commit_url }}">{{ commit_short }}</a> · {{ generated }} · <a href="{{ generator_url }}">app/panel</a> · <a href="{{ registry_url }}">registry.yaml</a> · <a href="{{ annotations_url }}">anotaciones.yaml</a></p>
+{%- endmacro -%}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Aletheia News · Panel didáctico</title>
+<style>
+@font-face{font-family:"Source Serif 4";src:local("Source Serif 4"),url(/static/fonts/source-serif-4-latin-400-normal.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Source Serif 4";src:local("Source Serif 4 Semibold"),url(/static/fonts/source-serif-4-latin-600-normal.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:Inter;src:local("Inter"),url(/static/fonts/inter-latin-400-normal.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:Inter;src:local("Inter SemiBold"),url(/static/fonts/inter-latin-600-normal.woff2) format("woff2");font-weight:600;font-display:swap}
+:root{
+  --bg:#FBFAF7;--surface:#FFFFFF;--soft:#F2EFE9;--ink:#1E1D1A;--ink2:#55524B;--ink3:#7A766D;--rule:#D9D4CA;
+  --accent:#1F5E8C;--brand:#5E5546;--note:#F5EEDF;--err:#A1221B;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;--sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#171614;--surface:#1F1E1B;--soft:#262420;--ink:#ECE8E1;--ink2:#BDB7AC;--ink3:#938D82;--rule:#3B3934;
+  --accent:#86B6DE;--brand:#B3A68F;--note:#2B2720;--err:#E7867E}}
+:root[data-theme="dark"]{--bg:#171614;--surface:#1F1E1B;--soft:#262420;--ink:#ECE8E1;--ink2:#BDB7AC;--ink3:#938D82;--rule:#3B3934;--accent:#86B6DE;--brand:#B3A68F;--note:#2B2720;--err:#E7867E}
+*{box-sizing:border-box}
+html{scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans);-webkit-text-size-adjust:100%}
+body:not(.en) .i18n[data-l="en"],body.en .i18n[data-l="es"]{display:none}
+a{color:var(--accent);text-underline-offset:2px}
+.untr{font-size:.75em;color:var(--ink3);font-style:normal}
+/* layout */
+.top{border-bottom:3px solid var(--brand);background:var(--bg);padding:20px 24px 16px}
+.top h1{font:600 1.75rem/1.2 var(--serif);margin:0 0 4px;letter-spacing:-.01em}
+.top .sub{color:var(--ink2);margin:0;max-width:72ch}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:14px;font-size:.8125rem;color:var(--ink2)}
+.bar .chip{border:1px solid var(--rule);border-radius:3px;padding:2px 8px;background:var(--surface)}
+.lang{display:inline-flex;border:1px solid var(--ink2);border-radius:3px;overflow:hidden}
+.lang button{font:600 .75rem var(--sans);border:0;padding:4px 10px;background:transparent;color:var(--ink);cursor:pointer;letter-spacing:.04em}
+.lang button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.search{position:relative;flex:1 1 260px;max-width:420px}
+.search input{width:100%;font:inherit;font-size:.875rem;padding:6px 10px;border:1px solid var(--ink3);border-radius:3px;background:var(--surface);color:var(--ink)}
+.results{position:absolute;z-index:20;left:0;right:0;top:100%;margin:4px 0 0;padding:4px 0;list-style:none;background:var(--surface);border:1px solid var(--rule);border-radius:3px;box-shadow:0 6px 18px rgba(0,0,0,.08);max-height:60vh;overflow:auto}
+.results li a{display:flex;justify-content:space-between;gap:12px;padding:5px 10px;text-decoration:none;color:var(--ink)}
+.results li a:hover,.results li a:focus{background:var(--soft)}
+.results .k{color:var(--ink3);font-size:.75rem}
+.wrap{display:grid;grid-template-columns:220px minmax(0,1fr);gap:0}
+nav.side{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:18px 12px 24px 20px;border-right:1px solid var(--rule)}
+nav.side ol{list-style:none;margin:0;padding:0;counter-reset:v}
+nav.side li{counter-increment:v}
+nav.side a{display:block;padding:5px 8px;border-radius:3px;color:var(--ink2);text-decoration:none;font-size:.875rem}
+nav.side a::before{content:counter(v,decimal-leading-zero);font:600 .6875rem var(--sans);color:var(--ink3);margin-right:8px;font-variant-numeric:tabular-nums}
+nav.side a.on{background:var(--soft);color:var(--ink);font-weight:600}
+nav.side a.alert{color:var(--ink)}
+nav.side a.alert::after{content:" ●";color:var(--brand)}
+main{padding:8px 32px 64px;min-width:0}
+section.view{padding:28px 0 8px;border-bottom:1px solid var(--rule)}
+section.view>h2{font:600 1.375rem/1.25 var(--serif);margin:0 0 6px}
+.lead{font:400 1.0625rem/1.55 var(--serif);color:var(--ink);max-width:72ch;margin:0 0 18px}
+h3{font:600 1rem/1.3 var(--sans);margin:22px 0 8px}
+h4{font:600 .8125rem/1.3 var(--sans);margin:14px 0 6px;color:var(--ink2);text-transform:uppercase;letter-spacing:.05em}
+p{margin:0 0 10px}
+.prose{font-family:var(--serif);font-size:1rem;max-width:72ch}
+.muted{color:var(--ink2)}.small{font-size:.8125rem}
+.vfoot{margin:22px 0 0;font-size:.75rem;color:var(--ink3)}
+.vfoot a{color:var(--ink3)}
+/* elements */
+.code{font:.8125rem var(--mono);color:var(--accent);text-decoration:none;border-bottom:1px dotted currentColor;word-break:break-word}
+.code .ln{color:var(--ink3)}
+.code.broken{color:var(--err);border-bottom-style:solid}
+.specref{font-size:.8125rem;color:var(--ink2)}
+.st{display:inline-block;font:600 .6875rem/1 var(--sans);padding:4px 7px;border-radius:2px;letter-spacing:.04em;text-transform:uppercase;vertical-align:middle;white-space:nowrap}
+.st.implementado{background:var(--ink);color:var(--bg)}
+.st.parcial{border:1.5px dashed var(--ink);color:var(--ink)}
+.st.especificado_no_implementado{border:1.5px dotted var(--ink2);color:var(--ink2);background:repeating-linear-gradient(135deg,transparent 0 4px,var(--soft) 4px 8px)}
+.who{display:inline-block;font:.6875rem/1 var(--sans);padding:4px 6px;border:1px solid var(--rule);border-radius:2px;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em;vertical-align:middle}
+.tag{display:inline-block;font:.75rem var(--mono);padding:1px 6px;border-radius:2px;background:var(--soft);color:var(--ink)}
+.note{background:var(--note);border-left:3px solid var(--brand);padding:10px 14px;margin:12px 0;max-width:80ch}
+.err{color:var(--err)}
+table{border-collapse:collapse;width:100%;margin:6px 0 16px;font-size:.875rem}
+th,td{text-align:left;vertical-align:top;padding:7px 10px 7px 0;border-bottom:1px solid var(--rule)}
+th{font-weight:600;font-size:.75rem;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em;border-bottom:1.5px solid var(--ink3)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;padding-right:14px}
+.tw{overflow-x:auto}
+pre{font:.75rem/1.5 var(--mono);background:var(--soft);padding:10px 12px;border-radius:3px;overflow:auto;max-height:420px;white-space:pre;margin:6px 0 12px}
+details.card{border:1px solid var(--rule);background:var(--surface);border-radius:4px;margin:10px 0}
+details.card>summary{list-style:none;cursor:pointer;padding:12px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;align-items:start}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary .nm{font:600 1rem/1.3 var(--sans)}
+details.card>summary .nm::before{content:"▸";display:inline-block;width:1em;color:var(--ink3);transition:transform .15s}
+details.card[open]>summary .nm::before{transform:rotate(90deg)}
+details.card>summary .one{grid-column:1/-1;color:var(--ink2);font-size:.875rem;padding-left:1em}
+details.card>summary .badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+details.card .body{padding:4px 16px 16px 32px;border-top:1px solid var(--rule)}
+.cols{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:8px 32px}
+dl.facts{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px;margin:8px 0;font-size:.875rem}
+dl.facts dt{color:var(--ink2);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+dl.facts dd{margin:0;min-width:0}
+ul.plain{list-style:none;padding:0;margin:0}
+ul.plain li{margin:0 0 6px}
+ul.dash{margin:0 0 8px;padding-left:18px}
+ul.dash li{margin:0 0 5px}
+details.sub{margin:4px 0}
+details.sub>summary{cursor:pointer;font-size:.8125rem;color:var(--accent)}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0 20px}
+.stat{border:1px solid var(--rule);background:var(--surface);border-radius:4px;padding:10px 12px}
+.stat b{display:block;font:600 1.5rem/1.1 var(--sans);font-variant-numeric:tabular-nums}
+.stat span{font-size:.8125rem;color:var(--ink2)}
+.rule{font:600 1.125rem/1.4 var(--serif);border-left:3px solid var(--ink);padding:4px 0 4px 14px;margin:14px 0 18px;max-width:60ch}
+ol.princ{padding-left:22px;max-width:80ch}
+ol.princ li{margin:0 0 6px}
+.week{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;border:1px solid var(--rule);border-radius:4px;overflow:hidden;margin:10px 0 18px}
+.week div{padding:10px 12px;border-right:1px solid var(--rule);background:var(--surface)}
+.week div:last-child{border-right:0}
+.week b{display:block;font-size:.8125rem}
+.week span{font-size:.8125rem;color:var(--ink2)}
+ol.path{counter-reset:p;list-style:none;padding:0;margin:8px 0 18px;max-width:86ch}
+ol.path li{counter-increment:p;display:grid;grid-template-columns:28px minmax(0,1fr);gap:0 10px;margin:0 0 10px}
+ol.path li::before{content:counter(p);font:600 .8125rem/24px var(--sans);text-align:center;border:1.5px solid var(--ink);border-radius:50%;width:24px;height:24px}
+.diagram{overflow-x:auto;border:1px solid var(--rule);background:var(--surface);border-radius:4px;padding:8px;margin:10px 0 6px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.8125rem;color:var(--ink2);margin:6px 0 14px;align-items:center}
+svg text{font-family:var(--sans)}
+svg .node rect{fill:var(--surface);stroke:var(--ink);stroke-width:1.4}
+svg .node.parcial rect{stroke-dasharray:6 3}
+svg .node.especificado_no_implementado rect{stroke:var(--ink3);stroke-dasharray:2 3}
+svg .node.especificado_no_implementado .hatchfill{stroke:none}
+svg .node.especificado_no_implementado .nl{fill:var(--ink2)}
+svg .hatch{stroke:var(--rule);stroke-width:2}
+svg a.node:hover rect,svg a.node:focus rect{stroke-width:2.4;stroke:var(--accent)}
+svg .nl{font-size:12.5px;font-weight:600;fill:var(--ink)}
+svg .ns{font-size:10.5px;fill:var(--ink2)}
+svg .nt{font-size:10px;font-weight:600;fill:var(--ink3)}
+svg .el{font-size:10.5px;fill:var(--ink2)}
+svg .edge{fill:none;stroke:var(--ink3);stroke-width:1.3}
+svg .edge.pending{stroke-dasharray:3 3}
+svg .arrowhead{fill:var(--ink3)}
+svg .arc{fill:none;stroke:var(--accent);opacity:.5}
+svg .dot{fill:var(--brand)}
+svg .al{font-size:11px;fill:var(--ink)}
+svg .as{font-size:10px;fill:var(--ink3)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.chips a{font:.8125rem var(--mono);text-decoration:none;color:var(--ink);border:1px solid var(--rule);background:var(--surface);border-radius:3px;padding:3px 8px}
+.chips a:hover{border-color:var(--accent);color:var(--accent)}
+.sev{font:600 .6875rem/1 var(--sans);text-transform:uppercase;letter-spacing:.05em;padding:3px 6px;border-radius:2px;border:1px solid var(--ink2)}
+.sev.alta{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.flow{display:flex;flex-wrap:wrap;gap:0;margin:10px 0 18px;counter-reset:f}
+.flow div{counter-increment:f;flex:1 1 180px;border:1px solid var(--rule);background:var(--surface);padding:10px 12px;margin:0 -1px -1px 0;font-size:.8125rem}
+.flow div::before{content:counter(f);font:600 .75rem var(--sans);color:var(--ink3);display:block}
+.problems{border:2px solid var(--err);padding:10px 14px;margin:16px 0;border-radius:4px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:900px){
+  .wrap{display:block}
+  nav.side{position:sticky;top:0;z-index:10;height:auto;background:var(--bg);border-right:0;border-bottom:1px solid var(--rule);padding:6px 16px;overflow-x:auto}
+  nav.side ol{display:flex;gap:2px;white-space:nowrap}
+  nav.side a{padding:6px 8px}
+  main{padding:0 16px 48px}
+  html{scroll-padding-top:56px}
+  .top{padding:16px}
+  .cols{grid-template-columns:1fr}
+  details.card .body{padding:4px 14px 14px}
+  dl.facts{grid-template-columns:1fr}
+  dl.facts dt{padding-top:6px}
+}
+@media print{nav.side,.bar{display:none}.wrap{display:block}details.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>{{ u("title") }}</h1>
+  <p class="sub">{{ u("subtitle") }}</p>
+  <div class="bar">
+    <div class="lang" role="group" aria-label="Idioma / Language"><button type="button" data-set="es" aria-pressed="true">ES</button><button type="button" data-set="en" aria-pressed="false">EN</button></div>
+    <div class="search"><label class="i18n" data-l="es" for="q" hidden>Buscar</label><input id="q" type="search" autocomplete="off" placeholder="{{ ui.search.es }}" data-ph-es="{{ ui.search.es }}" data-ph-en="{{ ui.search.en }}" aria-controls="res"><ul id="res" class="results" role="listbox" hidden></ul></div>
+    <span class="chip">commit <a href="{{ commit_url }}">{{ commit_short }}</a></span>
+    <span class="chip">{{ generated }}</span>
+    <span class="chip">{% if live and live.ok %}<span class="i18n" data-l="es">con datos de la base (solo lectura)</span><span class="i18n" data-l="en">with database data (read-only)</span>{% else %}<span class="i18n" data-l="es">sin datos de la base</span><span class="i18n" data-l="en">no database data</span>{% endif %}</span>
+  </div>
+</header>
+<div class="wrap">
+<nav class="side" aria-label="Vistas">
+  <ol>
+  {% for v in views %}<li><a href="#{{ v }}" data-v="{{ v }}"{% if v == "deuda" %} class="alert"{% endif %}>{{ u(v) }}</a></li>{% endfor %}
+  </ol>
+</nav>
+<main>
+{% if problems %}
+<div class="problems" role="alert">
+  <b><span class="i18n" data-l="es">El registro y el código no coinciden ({{ problems|length }})</span><span class="i18n" data-l="en">Registry and code disagree ({{ problems|length }})</span></b>
+  <ul class="dash small">{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{# ============================================================ 1. Visión general #}
+<section class="view" id="vision">
+  <h2>{{ u("vision") }}</h2>
+  <p class="lead">{{ t(vision.que_es) }}</p>
+  <p class="rule">{{ t(vision.regla_central) }} <span class="small">{{ code(vision.regla_link) }}</span></p>
+  <div class="grid4">
+    <div class="stat"><b>{{ vision.counts.impl }}<span class="muted small"> / {{ vision.counts.etapas }}</span></b><span><span class="i18n" data-l="es">etapas implementadas · {{ vision.counts.parcial }} parciales · {{ vision.counts.falta }} faltan</span><span class="i18n" data-l="en">stages implemented · {{ vision.counts.parcial }} partial · {{ vision.counts.falta }} missing</span></span></div>
+    <div class="stat"><b>{{ vision.counts.agentes_impl }}</b><span><span class="i18n" data-l="es">agentes con modelo · {{ vision.counts.agentes_falta }} especificados sin código</span><span class="i18n" data-l="en">model agents · {{ vision.counts.agentes_falta }} specified without code</span></span></div>
+    <div class="stat"><b>{{ vision.counts.compuertas }}</b><span><span class="i18n" data-l="es">compuertas en código</span><span class="i18n" data-l="en">gates in code</span></span></div>
+    <div class="stat"><b>{{ vision.counts.tablas }}</b><span><span class="i18n" data-l="es">tablas en {{ vision.counts.capas }} capas</span><span class="i18n" data-l="en">tables in {{ vision.counts.capas }} layers</span></span></div>
+    <div class="stat"><b>{{ vision.counts.pruebas }}</b><span><span class="i18n" data-l="es">pruebas · {{ vision.counts.workflows }} workflows</span><span class="i18n" data-l="en">tests · {{ vision.counts.workflows }} workflows</span></span></div>
+    <div class="stat"><b>{{ vision.counts.abiertas }}<span class="muted small"> / {{ vision.counts.decisiones }}</span></b><span><span class="i18n" data-l="es">decisiones abiertas [A confirmar]</span><span class="i18n" data-l="en">open decisions [A confirmar]</span></span></div>
+  </div>
+
+  <h3><span class="i18n" data-l="es">Si tienes una hora, lee esto en este orden</span><span class="i18n" data-l="en">If you have one hour, read these in order</span></h3>
+  <ol class="path">
+  {% for r in vision.recorrido %}<li><div><b>{{ t(r.titulo) }}</b> — {{ code(r.link) }}<br><span class="muted small">{{ t(r.por_que) }}</span></div></li>{% endfor %}
+  </ol>
+
+  <h3><span class="i18n" data-l="es">La semana</span><span class="i18n" data-l="en">The week</span></h3>
+  <div class="week">
+  {% for c in vision.cadencia %}<div><b>{{ t(c.cuando) }}</b><span>{{ t(c.que) }}</span><br>{{ code(c.link) }}</div>{% endfor %}
+  </div>
+
+  <h3><span class="i18n" data-l="es">Siete principios que no se negocian</span><span class="i18n" data-l="en">Seven non-negotiable principles</span></h3>
+  <ol class="princ">
+  {% for p in vision.principios %}<li>{{ t(p) }} <span class="small">{{ code(p.link) }}</span></li>{% endfor %}
+  </ol>
+  {{ foot("vision") }}
+</section>
+
+{# ============================================================ 2. Pipeline #}
+<section class="view" id="pipeline">
+  <h2>{{ u("pipeline") }}</h2>
+  <p class="lead"><span class="i18n" data-l="es">Cada caja es una etapa. Tocarla abre su ficha: qué hace, qué código la implementa, qué tablas escribe, qué compuerta la controla, cuándo corre y cómo probarla. Las cajas punteadas y rayadas son etapas que el encargo especifica y el código no tiene.</span><span class="i18n" data-l="en">Each box is a stage. Click it to open its card: what it does, which code implements it, which tables it writes, which gate controls it, when it runs and how to test it. Dotted, hatched boxes are stages the brief specifies and the code does not have.</span></p>
+  <div class="legend">
+    <span>{{ status("implementado") }}</span><span>{{ status("parcial") }}</span><span>{{ status("especificado_no_implementado") }}</span>
+    <span class="i18n" data-l="es">Segunda línea de cada caja: estado · quién la ejecuta (agente, código o editor). Líneas punteadas: dependencia de una etapa que falta.</span><span class="i18n" data-l="en">Second line of each box: status · who runs it (agent, code or editor). Dotted lines: dependency of a missing stage.</span>
+  </div>
+  <div class="diagram">{{ pipeline_svg }}</div>
+  <p class="small muted"><span class="i18n" data-l="es">Posición y dependencias: </span><span class="i18n" data-l="en">Position and dependencies: </span><a class="code" href="{{ registry_url }}">app/agents/registry.yaml</a> (<span class="tag">pos</span>, <span class="tag">sigue_a</span>).</p>
+
+  {% for s in stages %}
+  <details class="card" id="etapa-{{ s.id }}">
+    <summary>
+      <span class="nm">{% if s.paso_agentico %}<span class="muted small">{{ s.paso_agentico }} · </span>{% endif %}{{ t(s.name) }}</span>
+      <span class="badges">{{ status(s.estado) }}{{ who(s.ejecutor) }}</span>
+      <span class="one">{{ t(s.ann.proposito) }}</span>
+    </summary>
+    <div class="body cols">
+      <div>
+        <h4><span class="i18n" data-l="es">Principio que protege</span><span class="i18n" data-l="en">Principle it protects</span></h4>
+        <p class="prose">{{ t(s.ann.principio) }}</p>
+        {% if s.sustituido_por %}<p class="note small"><span class="i18n" data-l="es">Sustituida en el código por:</span><span class="i18n" data-l="en">Replaced in the code by:</span> <a href="#etapa-{{ s.sustituido_por }}">{{ t(names[s.sustituido_por]) }}</a></p>{% endif %}
+        {% if s.fallos %}<h4><span class="i18n" data-l="es">Fallos conocidos</span><span class="i18n" data-l="en">Known failures</span></h4>
+        <ul class="dash">{% for x in s.fallos %}<li>{{ t(x) }}{% if x.link %} <span class="small">{{ code(x.link) }}</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
+        {% if s.queue %}<h4><span class="i18n" data-l="es">Lo que manda a la cola</span><span class="i18n" data-l="en">What it sends to the queue</span></h4>
+        <ul class="plain small">{% for q in s.queue %}<li><span class="tag">{{ q.tipo }}</span> {{ t(q.significa) }}</li>{% endfor %}</ul>{% endif %}
+        {% if s.tests %}<h4><span class="i18n" data-l="es">Pruebas</span><span class="i18n" data-l="en">Tests</span></h4>
+        <ul class="plain small">{% for x in s.tests %}<li><a class="code" href="{{ x.url }}">{{ x.path }}::{{ x.name }}</a>{% if x.code %}<details class="sub"><summary><span class="i18n" data-l="es">ver código</span><span class="i18n" data-l="en">show code</span></summary><pre>{{ x.code }}</pre></details>{% endif %}</li>{% endfor %}</ul>
+        {% set pt = s.tests|selectattr("pytest")|list %}{% if pt %}<p class="small muted"><span class="i18n" data-l="es">Correr solas (con TEST_DATABASE_URL si usan la base):</span><span class="i18n" data-l="en">Run alone (with TEST_DATABASE_URL if they use the database):</span> <code class="tag">python -m pytest {% for x in pt %}{{ x.path }}::{{ x.name }} {% endfor %}</code></p>{% endif %}{% endif %}
+      </div>
+      <div>
+        <dl class="facts">
+          {% if s.code %}<dt><span class="i18n" data-l="es">Código</span><span class="i18n" data-l="en">Code</span></dt><dd><ul class="plain">{% for c in s.code %}<li>{{ code(c) }}</li>{% endfor %}</ul></dd>{% endif %}
+          {% if s.agents %}<dt><span class="i18n" data-l="es">Agentes</span><span class="i18n" data-l="en">Agents</span></dt><dd>{% for a in s.agents %}<a href="#agente-{{ a.id }}">{{ t(a.name) }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</dd>{% endif %}
+          {% if s.gates %}<dt><span class="i18n" data-l="es">Compuertas</span><span class="i18n" data-l="en">Gates</span></dt><dd>{% for g in s.gates %}<a href="#compuerta-{{ g.id }}">{{ t(g.name) }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</dd>{% endif %}
+          {% if s.usage.writes or s.usage.reads %}<dt><span class="i18n" data-l="es">Escribe</span><span class="i18n" data-l="en">Writes</span></dt><dd>{% for tb in s.usage.writes %}<a class="tag" href="#tabla-{{ tb }}">{{ tb }}</a> {% else %}—{% endfor %}</dd>
+          <dt><span class="i18n" data-l="es">Lee</span><span class="i18n" data-l="en">Reads</span></dt><dd>{% for tb in s.usage.reads %}<a class="tag" href="#tabla-{{ tb }}">{{ tb }}</a> {% else %}—{% endfor %}</dd>{% endif %}
+          {% if s.run_tipo %}<dt><span class="i18n" data-l="es">Registro</span><span class="i18n" data-l="en">Logged as</span></dt><dd><span class="tag">agent_run.tipo = {{ s.run_tipo }}</span><br><span class="small muted"><span class="i18n" data-l="es">pasos:</span><span class="i18n" data-l="en">steps:</span> {{ s.pasos_registrados|join(", ") }}</span>{% if s.budget is not none %}<br><span class="small muted"><span class="i18n" data-l="es">tope de gasto fijo:</span><span class="i18n" data-l="en">fixed cap:</span> {{ s.budget }} ¢</span>{% endif %}</dd>{% endif %}
+          {% if s.sched %}<dt><span class="i18n" data-l="es">Cuándo corre</span><span class="i18n" data-l="en">When it runs</span></dt><dd><ul class="plain">{% for x in s.sched %}<li>{{ code(x.link) }}{% for c in x.crons or [] %}<br><span class="small">{{ t(c) }}</span>{% endfor %}{% if x.dispatch %}<br><span class="small muted"><span class="i18n" data-l="es">y a mano desde Actions</span><span class="i18n" data-l="en">and manually from Actions</span></span>{% endif %}</li>{% endfor %}</ul></dd>{% endif %}
+          {% if s.cmd %}<dt>CLI</dt><dd><code class="tag">{{ s.cmd.text }}</code>{% if s.cmd.args %} <span class="small muted">{{ s.cmd.args|join(" ") }}</span>{% endif %}{% if s.cmd.help %}<br><span class="small muted">{{ s.cmd.help }}</span>{% endif %}</dd>{% endif %}
+          {% if s.pantalla %}<dt><span class="i18n" data-l="es">Pantalla</span><span class="i18n" data-l="en">Screen</span></dt><dd><span class="tag">{{ s.pantalla }}</span></dd>{% endif %}
+          {% if s.consts %}<dt><span class="i18n" data-l="es">Parámetros</span><span class="i18n" data-l="en">Parameters</span></dt><dd><ul class="plain small">{% for c in s.consts %}<li><a class="code" href="{{ c.url }}">{{ c.name }}</a> = {{ c.value }}{% if c.note %} <span class="muted">· {{ c.note }}</span>{% endif %}</li>{% endfor %}</ul></dd>{% endif %}
+          {% if s.live %}<dt><span class="i18n" data-l="es">En la base</span><span class="i18n" data-l="en">In the database</span></dt><dd class="small">{{ s.live.corridas }} <span class="i18n" data-l="es">corridas</span><span class="i18n" data-l="en">runs</span> · ok {{ s.live.ok }} · fallo {{ s.live.fallo }} · tope {{ s.live.tope_gasto }} · {{ s.live.costo_centavos }} ¢<br><span class="muted"><span class="i18n" data-l="es">última</span><span class="i18n" data-l="en">last</span>: {{ s.live.ultima }}</span></dd>{% endif %}
+          {% if s.spec %}<dt><span class="i18n" data-l="es">Especificación</span><span class="i18n" data-l="en">Specification</span></dt><dd>{{ spec(s.spec) }}</dd>{% endif %}
+        </dl>
+      </div>
+    </div>
+  </details>
+  {% endfor %}
+  <p class="small muted"><span class="i18n" data-l="es">"Escribe" y "Lee" se infieren del código de la etapa (constructores, borrados y consultas directas al modelo); no siguen llamadas a otras funciones. Los diagnósticos de cada corrida están en <span class="tag">/admin/corridas</span> (agent_run, agent_step).</span><span class="i18n" data-l="en">"Writes" and "Reads" are inferred from the stage's code (constructors, deletes and direct model queries); they do not follow calls into other functions. Per-run diagnostics are at <span class="tag">/admin/corridas</span> (agent_run, agent_step).</span></p>
+  {{ foot("pipeline") }}
+</section>
+
+{# ============================================================ 3. Agentes #}
+<section class="view" id="agentes">
+  <h2>{{ u("agentes") }}</h2>
+  <p class="lead"><span class="i18n" data-l="es">Un agente es una llamada a un modelo con una tarea estrecha. Todo lo que propone pasa por una compuerta en código antes de tocar la base, y cada llamada queda en agent_step con modelo, versión de prompt, tokens y costo.</span><span class="i18n" data-l="en">An agent is a model call with a narrow task. Everything it proposes passes a code gate before touching the database, and every call is logged in agent_step with model, prompt version, tokens and cost.</span></p>
+  <div class="note"><b><span class="i18n" data-l="es">Dos límites de rol que no se negocian.</span><span class="i18n" data-l="en">Two non-negotiable role limits.</span></b>
+    <span class="i18n" data-l="es">El agente académico solo busca y atribuye literatura publicada: nunca redacta enunciados explicativos ni normativos (y la base lo impide: restricción <span class="tag">ck_no_llm_explanatory</span>). Ningún agente asigna a mano la posición de un medio: se estima con intervalo.</span><span class="i18n" data-l="en">The academic agent only finds and attributes published literature: it never writes explanatory or normative statements (the database prevents it: constraint <span class="tag">ck_no_llm_explanatory</span>). No agent hand-assigns an outlet's position: it is estimated with an interval.</span></div>
+  <div class="tw"><table>
+    <thead><tr><th><span class="i18n" data-l="es">Agente</span><span class="i18n" data-l="en">Agent</span></th><th><span class="i18n" data-l="es">Etapa</span><span class="i18n" data-l="en">Stage</span></th><th><span class="i18n" data-l="es">Estado</span><span class="i18n" data-l="en">Status</span></th><th><span class="i18n" data-l="es">Rol</span><span class="i18n" data-l="en">Role</span></th><th><span class="i18n" data-l="es">Modelo configurado</span><span class="i18n" data-l="en">Configured model</span></th><th>Prompt</th>{% if live and live.ok %}<th class="num"><span class="i18n" data-l="es">Pasos</span><span class="i18n" data-l="en">Steps</span></th><th class="num">¢</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for a in agents %}<tr>
+      <td><a href="#agente-{{ a.id }}">{{ t(a.name) }}</a></td>
+      <td><a href="#etapa-{{ a.etapa }}">{{ t(names[a.etapa]) }}</a></td>
+      <td>{{ status(a.estado) }}</td>
+      <td>{% if a.rol_modelo %}<span class="tag">{{ a.rol_modelo }}</span>{% else %}—{% endif %}</td>
+      <td class="small">{% if a.models %}{{ a.models[0].value }} <span class="muted">({{ a.models[0].where }})</span>{% else %}—{% endif %}</td>
+      <td>{% if a.version %}<span class="tag">{{ a.version }}</span>{% else %}—{% endif %}</td>
+      {% if live and live.ok %}<td class="num">{{ a.live.pasos if a.live else "—" }}</td><td class="num">{{ a.live.costo_centavos if a.live else "—" }}</td>{% endif %}
+    </tr>{% endfor %}
+    </tbody></table></div>
+  {% if live and live.ok and live.effective_models %}
+  <p class="small"><b><span class="i18n" data-l="es">Efectivo en este servidor:</span><span class="i18n" data-l="en">Effective on this server:</span></b>
+  {% for m in live.effective_models %}{{ m.role }} = {{ m.provider }}:{{ m.model }}{% if not m.key %} <span class="err">(<span class="i18n" data-l="es">sin clave</span><span class="i18n" data-l="en">no key</span>)</span>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {% endif %}
+
+  {% for a in agents %}
+  <details class="card" id="agente-{{ a.id }}">
+    <summary><span class="nm">{{ t(a.name) }}</span><span class="badges">{{ status(a.estado) }}</span><span class="one">{{ t(a.ann.tarea) }}</span></summary>
+    <div class="body cols">
+      <div>
+        {% if a.ann.limite %}<p class="note small">{{ t(a.ann.limite) }}</p>{% endif %}
+        {% if a.prompt_text %}<h4><span class="i18n" data-l="es">Instrucciones del modelo</span><span class="i18n" data-l="en">Model instructions</span> · <span class="tag">{{ a.version }}</span></h4>
+        <details class="sub"><summary><span class="i18n" data-l="es">ver prompt</span><span class="i18n" data-l="en">show prompt</span></summary><pre>{{ a.prompt_text }}</pre></details>
+        <p class="small muted"><span class="i18n" data-l="es">Al cambiar el prompt, sube la versión: queda en cada agent_step y en las afirmaciones.</span><span class="i18n" data-l="en">When you change the prompt, bump the version: it is stored on every agent_step and on the claims.</span></p>{% endif %}
+        {% if a.ann.sin_modelo %}<p class="small"><b><span class="i18n" data-l="es">Sin clave o sin presupuesto:</span><span class="i18n" data-l="en">Without a key or budget:</span></b> {{ t(a.ann.sin_modelo) }}</p>{% endif %}
+      </div>
+      <div>
+        <dl class="facts">
+          <dt><span class="i18n" data-l="es">Etapa</span><span class="i18n" data-l="en">Stage</span></dt><dd><a href="#etapa-{{ a.etapa }}">{{ t(names[a.etapa]) }}</a></dd>
+          {% if a.prompt_link %}<dt>Prompt</dt><dd>{{ code(a.prompt_link) }}<br>{{ code(a.version_link) }}</dd>{% endif %}
+          {% if a.call_link %}<dt><span class="i18n" data-l="es">Llamada</span><span class="i18n" data-l="en">Call site</span></dt><dd>{{ code(a.call_link) }}</dd>{% endif %}
+          {% if a.models %}<dt><span class="i18n" data-l="es">Modelo</span><span class="i18n" data-l="en">Model</span></dt><dd><ul class="plain small">{% for m in a.models %}<li><span class="tag">{{ m.var }}</span> = {{ m.value }} <span class="muted">· {{ m.where }}</span></li>{% endfor %}</ul><span class="small muted"><span class="i18n" data-l="es">El primero que esté definido gana.</span><span class="i18n" data-l="en">The first one defined wins.</span></span></dd>{% endif %}
+          {% if a.verifica_a %}<dt><span class="i18n" data-l="es">Verifica a</span><span class="i18n" data-l="en">Checks</span></dt><dd><a href="#agente-{{ a.verifica_a }}">{{ t(names[a.verifica_a]) }}</a></dd>{% endif %}
+          {% if a.gates %}<dt><span class="i18n" data-l="es">Compuertas</span><span class="i18n" data-l="en">Gates</span></dt><dd>{% for g in a.gates %}<a href="#compuerta-{{ g.id }}">{{ t(g.name) }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</dd>{% endif %}
+          {% if a.queue %}<dt><span class="i18n" data-l="es">Cola</span><span class="i18n" data-l="en">Queue</span></dt><dd>{% for q in a.queue %}<span class="tag">{{ q }}</span> {% endfor %}</dd>{% endif %}
+          {% if a.live %}<dt><span class="i18n" data-l="es">En la base</span><span class="i18n" data-l="en">In the database</span></dt><dd class="small">{{ a.live.pasos }} <span class="i18n" data-l="es">pasos</span><span class="i18n" data-l="en">steps</span> · {{ a.live.fallos }} <span class="i18n" data-l="es">fallos</span><span class="i18n" data-l="en">failures</span> · {{ a.live.tokens_in }}/{{ a.live.tokens_out }} tokens · {{ a.live.costo_centavos }} ¢ · {{ a.live.ms_medio }} ms<br><span class="muted">{{ a.live.modelos }} · {{ a.live.prompts }}</span></dd>{% endif %}
+          {% if a.spec %}<dt><span class="i18n" data-l="es">Especificación</span><span class="i18n" data-l="en">Specification</span></dt><dd>{{ spec(a.spec) }}</dd>{% endif %}
+        </dl>
+      </div>
+    </div>
+  </details>
+  {% endfor %}
+  {{ foot("agentes") }}
+</section>
+
+{# ============================================================ 4. Compuertas #}
+<section class="view" id="compuertas">
+  <h2>{{ u("compuertas") }}</h2>
+  <p class="lead"><span class="i18n" data-l="es">Las reglas que deciden viven en código, no en prompts. Cada ficha da la regla en una frase, la función que la implementa, dónde se llama y las pruebas que muestran un caso que pasa y uno que falla.</span><span class="i18n" data-l="en">The rules that decide live in code, not prompts. Each card gives the rule in one sentence, the function that implements it, where it is called, and the tests that show a passing and a failing case.</span></p>
+  {% for g in gates %}
+  <details class="card" id="compuerta-{{ g.id }}">
+    <summary><span class="nm">{{ t(g.name) }}</span><span class="badges">{% if g.unwired %}<span class="st parcial"><span class="i18n" data-l="es">sin conectar</span><span class="i18n" data-l="en">not wired</span></span>{% endif %}{% if not g.tests %}<span class="who"><span class="i18n" data-l="es">sin prueba</span><span class="i18n" data-l="en">no test</span></span>{% endif %}</span><span class="one">{{ t(g.ann.regla) }}</span></summary>
+    <div class="body cols">
+      <div>
+        <h4><span class="i18n" data-l="es">Si falla</span><span class="i18n" data-l="en">On failure</span></h4>
+        <p class="small">{{ t(g.ann.al_fallar) }}</p>
+        {% if g.tests %}<h4><span class="i18n" data-l="es">Ejemplos, tomados de las pruebas</span><span class="i18n" data-l="en">Examples, taken from the tests</span></h4>
+        {% for x in g.tests %}<p class="small"><a class="code" href="{{ x.url }}">{{ x.name }}</a></p>{% if x.code %}<pre>{{ x.code }}</pre>{% endif %}{% endfor %}{% endif %}
+      </div>
+      <div>
+        <dl class="facts">
+          <dt><span class="i18n" data-l="es">Código</span><span class="i18n" data-l="en">Code</span></dt>
+          <dd><ul class="plain">{% for c in g.code %}<li>{{ code(c) }}{% if c.callable %}<br><span class="small muted"><span class="i18n" data-l="es">llamadas en app: {{ c.callers_app }} · en pruebas: {{ c.callers_tests }}</span><span class="i18n" data-l="en">calls in app: {{ c.callers_app }} · in tests: {{ c.callers_tests }}</span></span>{% if c.callers %}<ul class="plain small" style="margin:2px 0 6px 10px">{% for x in c.callers %}<li><span class="muted">←</span> <a class="code" href="{{ x.url }}">{{ x.label }}</a></li>{% endfor %}</ul>{% endif %}{% endif %}</li>{% endfor %}</ul></dd>
+          {% if g.stages %}<dt><span class="i18n" data-l="es">Etapas</span><span class="i18n" data-l="en">Stages</span></dt><dd>{% for sid in g.stages %}<a href="#etapa-{{ sid }}">{{ t(names[sid]) }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</dd>{% endif %}
+        </dl>
+        {% if g.unwired %}<p class="note small"><span class="i18n" data-l="es">Ninguna función de la aplicación llama a {% for c in g.unwired %}<span class="tag">{{ c.symbol }}</span> {% endfor %}: hoy solo la ejercitan las pruebas.</span><span class="i18n" data-l="en">No application function calls {% for c in g.unwired %}<span class="tag">{{ c.symbol }}</span> {% endfor %}: today only the tests exercise it.</span></p>{% endif %}
+      </div>
+    </div>
+  </details>
+  {% endfor %}
+  <p class="small muted"><span class="i18n" data-l="es">El conteo de llamadas es aproximado: busca llamadas por nombre en app/, tests/ y evals/.</span><span class="i18n" data-l="en">Call counts are approximate: they look for calls by name in app/, tests/ and evals/.</span></p>
+  {{ foot("compuertas") }}
+</section>
+
+{# ============================================================ 5. Cola y autonomía #}
+<section class="view" id="cola">
+  <h2>{{ u("cola") }}</h2>
+  <p class="lead"><span class="i18n" data-l="es">Lo que una compuerta no resuelve va a <span class="tag">review_item</span> y aparece en <span class="tag">/admin/fila</span>. El editor revisa la cola, no cada oración. Estos son todos los tipos que el código puede emitir hoy.</span><span class="i18n" data-l="en">Whatever a gate cannot resolve goes to <span class="tag">review_item</span> and shows up at <span class="tag">/admin/fila</span>. The editor works the queue, not every sentence. These are all the types the code can emit today.</span></p>
+  <div class="tw"><table>
+    <thead><tr><th><span class="i18n" data-l="es">Tipo</span><span class="i18n" data-l="en">Type</span></th><th><span class="i18n" data-l="es">Qué significa</span><span class="i18n" data-l="en">What it means</span></th><th><span class="i18n" data-l="es">Cómo resolverlo</span><span class="i18n" data-l="en">How to resolve it</span></th><th><span class="i18n" data-l="es">Origen</span><span class="i18n" data-l="en">Origin</span></th>{% if live and live.ok %}<th class="num"><span class="i18n" data-l="es">Pend.</span><span class="i18n" data-l="en">Pending</span></th>{% endif %}</tr></thead>
+    <tbody>{% for q in queue %}<tr><td><span class="tag">{{ q.tipo }}</span></td><td>{{ t(q.ann.significa) }}</td><td>{{ t(q.ann.resolver) }}</td><td class="small">{% if q.stage %}<a href="#etapa-{{ q.stage }}">{{ t(names[q.stage]) }}</a><br>{% endif %}<a class="code" href="{{ q.link }}">{{ q.where }}</a></td>{% if live and live.ok %}<td class="num">{{ q.live.pendientes if q.live else 0 }}</td>{% endif %}</tr>{% endfor %}</tbody>
+  </table></div>
+
+  <h3 id="autonomia"><span class="i18n" data-l="es">Niveles de autonomía</span><span class="i18n" data-l="en">Autonomy levels</span></h3>
+  <p class="small">{% if autonomy.current %}<b><span class="i18n" data-l="es">Nivel vigente:</span><span class="i18n" data-l="en">Current level:</span></b> {% for c in autonomy.current %}{{ c.id }} = <b>{{ c.autonomy_level }}</b>{% if not loop.last %} · {% endif %}{% endfor %}{% else %}<span class="i18n" data-l="es">Nivel vigente: se lee de la base (</span><span class="i18n" data-l="en">Current level: read from the database (</span><span class="tag">country.autonomy_level</span>) — <span class="i18n" data-l="es">sin datos en esta generación; el valor por defecto en el esquema es 1.</span><span class="i18n" data-l="en">no data in this build; the schema default is 1.</span>{% endif %} {{ code(autonomy.model) }} · {{ code(autonomy.admin) }}</p>
+  {% if autonomy.rows %}<div class="tw"><table>
+    <thead><tr>{% for c in autonomy.rows[0] %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for r in autonomy.rows[1:] %}<tr>{% for c in r %}<td>{{ c|replace("**","") }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="small muted"><span class="i18n" data-l="es">Tabla leída de</span><span class="i18n" data-l="en">Table read from</span> {{ code(autonomy.link) }}.</p>{% endif %}
+  <dl class="facts">
+    <dt><span class="i18n" data-l="es">Para subir</span><span class="i18n" data-l="en">To raise</span></dt><dd>{{ t(autonomy.subir) }}</dd>
+    <dt><span class="i18n" data-l="es">Para bajar</span><span class="i18n" data-l="en">To lower</span></dt><dd>{{ t(autonomy.bajar) }}</dd>
+  </dl>
+  <p class="note"><b>{{ t(autonomy.electoral) }}</b></p>
+  {{ foot("cola") }}
+</section>
+
+{# ============================================================ 6. Modelo de datos #}
+<section class="view" id="datos">
+  <h2>{{ u("datos") }}</h2>
+  <p class="lead"><span class="i18n" data-l="es">Generado desde <span class="tag">app/models.py</span>, que es la fuente de las migraciones. Cada punto es una capa (su tamaño, el número de tablas); cada arco, las claves foráneas que cruzan de una capa a otra. Tocar una tabla abre sus columnas, restricciones y quién la escribe.</span><span class="i18n" data-l="en">Generated from <span class="tag">app/models.py</span>, the source of the migrations. Each dot is a layer (its size, the number of tables); each arc, the foreign keys that cross between layers. Click a table to see its columns, constraints and who writes it.</span></p>
+  <div class="diagram">{{ layers_svg }}</div>
+  {% for l in layers %}
+  <h3 id="capa-{{ l.slug }}">{{ l.slug }} <span class="muted small">· {{ l.tables|length }}</span></h3>
+  <div class="chips">{% for tb in l.tables %}<a href="#tabla-{{ tb.name }}">{{ tb.name }}</a>{% endfor %}</div>
+  {% for tb in l.tables %}
+  <details class="card" id="tabla-{{ tb.name }}">
+    <summary><span class="nm"><span class="tag">{{ tb.name }}</span></span><span class="badges">{% if tb.checks %}<span class="who">{{ tb.checks|length }} check</span>{% endif %}{% if not tb.writers %}<span class="who"><span class="i18n" data-l="es">sin escritor</span><span class="i18n" data-l="en">no writer</span></span>{% endif %}</span><span class="one">{% if tb.inv %}{{ t(tb.inv) }}{% elif tb.doc %}{{ tb.doc.split("\n")[0] }}{% endif %}</span></summary>
+    <div class="body cols">
+      <div class="tw"><table class="small">
+        <thead><tr><th><span class="i18n" data-l="es">Columna</span><span class="i18n" data-l="en">Column</span></th><th><span class="i18n" data-l="es">Tipo</span><span class="i18n" data-l="en">Type</span></th><th><span class="i18n" data-l="es">Nota</span><span class="i18n" data-l="en">Note</span></th></tr></thead>
+        <tbody>{% for c in tb.columns %}<tr><td><code>{{ c.name }}</code>{% if c.pk %} <span class="muted">PK</span>{% endif %}</td><td><code>{{ c.type }}</code>{% if c.fk %} → <a href="#tabla-{{ c.fk }}">{{ c.fk }}</a>{% endif %}</td><td class="muted">{{ c.comment }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      <div>
+        <dl class="facts">
+          <dt><span class="i18n" data-l="es">Definición</span><span class="i18n" data-l="en">Definition</span></dt><dd><a class="code" href="{{ tb.url }}">app/models.py::{{ tb.cls }}</a></dd>
+          {% if tb.checks %}<dt><span class="i18n" data-l="es">Restricciones</span><span class="i18n" data-l="en">Constraints</span></dt><dd><ul class="plain small">{% for c in tb.checks %}<li><span class="tag">{{ c.name }}</span><br><code>{{ c.expr }}</code></li>{% endfor %}</ul></dd>{% endif %}
+          <dt><span class="i18n" data-l="es">Escrita por</span><span class="i18n" data-l="en">Written by</span></dt><dd><ul class="plain small">{% for w in tb.writers %}<li><a class="code" href="{{ w.url }}">{{ w.key }}</a>{% if w.stage %} · <a href="#etapa-{{ w.stage }}">{{ t(names[w.stage]) }}</a>{% endif %}</li>{% else %}<li class="muted">—</li>{% endfor %}</ul></dd>
+          {% if tb.referenced_by %}<dt><span class="i18n" data-l="es">Referida por</span><span class="i18n" data-l="en">Referenced by</span></dt><dd>{% for r in tb.referenced_by %}<a class="tag" href="#tabla-{{ r }}">{{ r }}</a> {% endfor %}</dd>{% endif %}
+        </dl>
+        {% if tb.doc %}<p class="small muted">{{ tb.doc }}</p>{% endif %}
+      </div>
+    </div>
+  </details>
+  {% endfor %}
+  {% endfor %}
+  <h3><span class="i18n" data-l="es">Migraciones</span><span class="i18n" data-l="en">Migrations</span></h3>
+  <ul class="plain small">{% for m in infra.migrations %}<li><a class="code" href="{{ m.url }}">{{ m.file }}</a> <span class="muted">· {{ m.doc }}</span></li>{% endfor %}</ul>
+  {{ foot("datos") }}
+</section>
+
+{# ============================================================ 7. Chat #}
+<section class="view" id="chat">
+  <h2>{{ u("chat") }}</h2>
+  <p class="lead"><span class="i18n" data-l="es">El chat responde solo con la edición publicada. El modelo propone una respuesta en segmentos tipados; el código decide si se envía. Nada se transmite al lector antes de pasar el verificador (D16).</span><span class="i18n" data-l="en">The chat answers only from the published edition. The model proposes an answer in typed segments; code decides whether it is sent. Nothing reaches the reader before it passes the verifier (D16).</span></p>
+  <div class="flow">{% for x in chat.flow %}<div>{{ t(x.text) }}<br>{{ code(x.link) }}</div>{% endfor %}</div>
+  <h3><span class="i18n" data-l="es">Las nueve reglas y cómo se evalúan</span><span class="i18n" data-l="en">The nine rules and how they are evaluated</span></h3>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th><span class="i18n" data-l="es">Regla</span><span class="i18n" data-l="en">Rule</span></th><th><span class="i18n" data-l="es">Preguntas del set</span><span class="i18n" data-l="en">Eval questions</span></th><th><span class="i18n" data-l="es">Dónde</span><span class="i18n" data-l="en">Where</span></th></tr></thead>
+    <tbody>{% for r in chat.rules %}<tr><td>{{ loop.index }}</td><td>{{ t(r.texto) }}</td><td class="small">{% for k, n in r.counts.items() %}<span class="tag">{{ k }}</span> {{ n }} {% else %}—{% endfor %}</td><td>{{ code(r.link) }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="small"><span class="i18n" data-l="es">Set de evaluación:</span><span class="i18n" data-l="en">Evaluation set:</span> <a class="code" href="{{ chat.eval_link }}">evals/chat_eval.jsonl</a> · {{ chat.evals.total }} <span class="i18n" data-l="es">preguntas</span><span class="i18n" data-l="en">questions</span> ({% for k, n in chat.evals.langs.items() %}{{ k }} {{ n }}{% if not loop.last %}, {% endif %}{% endfor %}) · <code class="tag">python -m app.cli eval-chat --out build/eval</code></p>
+  {% if chat.resultados %}<p class="note small">{{ t(chat.resultados) }}</p>{% endif %}
+  {% if live and live.ok and live.chat_30d %}<p class="small"><b><span class="i18n" data-l="es">Últimos 30 días:</span><span class="i18n" data-l="en">Last 30 days:</span></b> {% for r in live.chat_30d %}{{ r.preguntas }} <span class="i18n" data-l="es">preguntas</span><span class="i18n" data-l="en">questions</span> · {{ r.rechazos }} <span class="i18n" data-l="es">rechazos del verificador</span><span class="i18n" data-l="en">verifier rejections</span> · {{ r.negativas }} <span class="i18n" data-l="es">negativas</span><span class="i18n" data-l="en">refusals</span> · {{ r.costo_centavos }} ¢{% endfor %}</p>{% endif %}
+  {{ foot("chat") }}
+</section>
+
+{# ============================================================ 8. Infraestructura #}
+<section class="view" id="infra">
+  <h2>{{ u("infra") }}</h2>
+  <p class="lead"><span class="i18n" data-l="es">Qué corre dónde, leído de <span class="tag">render.yaml</span> y <span class="tag">.github/workflows</span>. Las flechas salen de los secretos que cada servicio declara.</span><span class="i18n" data-l="en">What runs where, read from <span class="tag">render.yaml</span> and <span class="tag">.github/workflows</span>. Arrows come from the secrets each service declares.</span></p>
+  <div class="diagram">{{ infra.svg }}</div>
+  <ul class="plain">{% for s in infra.services %}<li><b>{{ s.nombre }}</b> — {{ t(s.que) }} <span class="small">{{ code(s.link) }}</span></li>{% endfor %}</ul>
+  {% if infra.render %}<h3>Render</h3>
+  <div class="tw"><table class="small"><thead><tr>{% for k in infra.render[0].keys() %}<th>{{ k }}</th>{% endfor %}</tr></thead><tbody>{% for r in infra.render %}<tr>{% for v in r.values() %}<td>{{ v if v is not none else "—" }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endif %}
+  <h3 id="workflows">GitHub Actions</h3>
+  <div class="tw"><table class="small">
+    <thead><tr><th>Workflow</th><th><span class="i18n" data-l="es">Cuándo</span><span class="i18n" data-l="en">When</span></th><th><span class="i18n" data-l="es">Ejecuta</span><span class="i18n" data-l="en">Runs</span></th><th><span class="i18n" data-l="es">Secretos</span><span class="i18n" data-l="en">Secrets</span></th></tr></thead>
+    <tbody>{% for w in infra.workflows %}<tr><td><a class="code" href="{{ w.url }}">{{ w.file }}</a></td><td>{% for c in w.crons %}{{ t(c) }}<br>{% endfor %}{% if w.dispatch %}<span class="muted"><span class="i18n" data-l="es">manual</span><span class="i18n" data-l="en">manual</span>{% if w.inputs %} ({{ w.inputs|join(", ") }}){% endif %}</span><br>{% endif %}{% for tr in w.triggers if tr not in ("schedule", "workflow_dispatch") %}<span class="muted">{{ tr }}</span> {% endfor %}{% if w.timeout %}<br><span class="muted">timeout {{ w.timeout }} min</span>{% endif %}</td><td><ul class="plain">{% for r in w.runs %}<li><code>{{ r }}</code></li>{% endfor %}</ul></td><td>{% for s in w.secrets %}<span class="tag">{{ s }}</span> {% else %}—{% endfor %}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <h3 id="env"><span class="i18n" data-l="es">Variables de entorno</span><span class="i18n" data-l="en">Environment variables</span></h3>
+  <p class="small muted"><span class="i18n" data-l="es">Nombres y dónde se definen. Los valores de los secretos nunca se muestran: se configuran en Render (Environment) y en GitHub (Settings → Secrets and variables → Actions).</span><span class="i18n" data-l="en">Names and where they are set. Secret values are never shown: they are set in Render (Environment) and in GitHub (Settings → Secrets and variables → Actions).</span></p>
+  <div class="tw"><table class="small">
+    <thead><tr><th><span class="i18n" data-l="es">Variable</span><span class="i18n" data-l="en">Variable</span></th><th><span class="i18n" data-l="es">Por defecto en código</span><span class="i18n" data-l="en">Code default</span></th><th>render.yaml</th><th>workflows</th><th><span class="i18n" data-l="es">Leída en</span><span class="i18n" data-l="en">Read in</span></th></tr></thead>
+    <tbody>{% for r in infra.env %}<tr><td><code>{{ r.name }}</code>{% if r.secret %} <span class="who"><span class="i18n" data-l="es">secreto</span><span class="i18n" data-l="en">secret</span></span>{% endif %}</td><td>{{ r.default if r.default else "—" }}</td><td>{% if r.render == "secret" %}<span class="muted">sync: false</span>{% else %}{{ r.render if r.render else "—" }}{% endif %}</td><td>{% for wf, v in r.workflows.items() %}<span class="muted">{{ wf.split("/")[-1] }}:</span> {{ "secret" if v == "secret" else v }}<br>{% else %}—{% endfor %}</td><td>{% for c in r.code_links %}<a class="code" href="{{ c.url }}">{{ c.label }}</a><br>{% else %}—{% endfor %}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <h3><span class="i18n" data-l="es">Límites que afectan la operación</span><span class="i18n" data-l="en">Limits that affect operation</span></h3>
+  <ul class="dash">{% for x in infra.limits %}<li>{{ t(x) }} {% if x.link %}<span class="small">{{ code(x.link) }}</span>{% endif %}</li>{% endfor %}</ul>
+  {{ foot("infra") }}
+</section>
+
+{# ============================================================ 9. Runbook #}
+<section class="view" id="runbook">
+  <h2>{{ u("runbook") }}</h2>
+  <p class="lead"><span class="i18n" data-l="es">Procedimientos de la semana. "Sin soporte" quiere decir que el código no ofrece una forma de hacerlo: el procedimiento describe el atajo manual y por qué es deuda.</span><span class="i18n" data-l="en">Weekly procedures. "Not supported" means the code offers no way to do it: the procedure describes the manual workaround and why it is debt.</span></p>
+  <div class="week">{% for c in vision.cadencia %}<div><b>{{ t(c.cuando) }}</b><span>{{ t(c.que) }}</span></div>{% endfor %}</div>
+  {% for r in runbook %}
+  <details class="card" id="rb-{{ r.id }}">
+    <summary><span class="nm">{{ t(r.titulo) }}</span><span class="badges">{% if r.soporte == "si" %}{{ status("implementado") }}{% elif r.soporte == "parcial" %}{{ status("parcial") }}{% else %}<span class="st especificado_no_implementado"><span class="i18n" data-l="es">sin soporte</span><span class="i18n" data-l="en">not supported</span></span>{% endif %}</span></summary>
+    <div class="body"><ol class="dash">{% for p in r.pasos %}<li>{{ t(p) }}</li>{% endfor %}</ol>
+    <p class="small">{% for l in r.links %}{{ code(l) }}{% if not loop.last %} · {% endif %}{% endfor %}</p></div>
+  </details>
+  {% endfor %}
+  <h3><span class="i18n" data-l="es">Comandos</span><span class="i18n" data-l="en">Commands</span> <span class="muted small">python -m app.cli …</span></h3>
+  <div class="tw"><table class="small"><thead><tr><th><span class="i18n" data-l="es">Comando</span><span class="i18n" data-l="en">Command</span></th><th><span class="i18n" data-l="es">Argumentos</span><span class="i18n" data-l="en">Arguments</span></th><th><span class="i18n" data-l="es">Qué hace</span><span class="i18n" data-l="en">What it does</span></th></tr></thead>
+  <tbody>{% for c in cli %}<tr><td><a class="code" href="{{ c.url }}">{{ c.name }}</a></td><td><code>{{ c.args|join(" ") }}</code></td><td>{{ c.help }}</td></tr>{% endfor %}</tbody></table></div>
+  <h3><span class="i18n" data-l="es">Pantallas y rutas</span><span class="i18n" data-l="en">Screens and routes</span></h3>
+  <div class="tw"><table class="small"><thead><tr><th></th><th><span class="i18n" data-l="es">Ruta</span><span class="i18n" data-l="en">Route</span></th><th><span class="i18n" data-l="es">Función</span><span class="i18n" data-l="en">Function</span></th></tr></thead>
+  <tbody>{% for r in routes %}<tr><td><span class="tag">{{ r.method }}</span></td><td><code>{{ r.path }}</code></td><td><a class="code" href="{{ r.url }}">{{ r.file }}::{{ r.func }}</a>{% if r.doc %} <span class="muted">· {{ r.doc }}</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+  {{ foot("runbook") }}
+</section>
+
+{# ============================================================ 10. Costos #}
+<section class="view" id="costos">
+  <h2>{{ u("costos") }}</h2>
+  {% if live and live.ok %}
+  <p class="lead"><span class="i18n" data-l="es">Agregados leídos de la base en una transacción de solo lectura. Sin datos de lectores ni contenido de conversaciones.</span><span class="i18n" data-l="en">Aggregates read from the database in a read-only transaction. No reader data and no conversation content.</span></p>
+  <h3><span class="i18n" data-l="es">Corridas por etapa</span><span class="i18n" data-l="en">Runs per stage</span></h3>
+  <div class="tw"><table class="small"><thead><tr><th>tipo</th><th class="num"><span class="i18n" data-l="es">corridas</span><span class="i18n" data-l="en">runs</span></th><th class="num">ok</th><th class="num">fallo</th><th class="num">tope</th><th class="num">¢</th><th><span class="i18n" data-l="es">última</span><span class="i18n" data-l="en">last</span></th></tr></thead>
+  <tbody>{% for r in live.runs %}<tr><td>{{ r.tipo }}</td><td class="num">{{ r.corridas }}</td><td class="num">{{ r.ok }}</td><td class="num">{{ r.fallo }}</td><td class="num">{{ r.tope_gasto }}</td><td class="num">{{ r.costo_centavos }}</td><td>{{ r.ultima }}</td></tr>{% else %}<tr><td colspan="7" class="muted"><span class="i18n" data-l="es">Sin corridas registradas.</span><span class="i18n" data-l="en">No runs recorded.</span></td></tr>{% endfor %}</tbody></table></div>
+  <h3><span class="i18n" data-l="es">Pasos por agente</span><span class="i18n" data-l="en">Steps per agent</span></h3>
+  <div class="tw"><table class="small"><thead><tr><th>agente</th><th class="num"><span class="i18n" data-l="es">pasos</span><span class="i18n" data-l="en">steps</span></th><th class="num">fallos</th><th class="num">tokens in</th><th class="num">tokens out</th><th class="num">¢</th><th class="num">ms</th><th><span class="i18n" data-l="es">modelos · prompts</span><span class="i18n" data-l="en">models · prompts</span></th></tr></thead>
+  <tbody>{% for r in live.steps %}<tr><td>{{ r.agente }}</td><td class="num">{{ r.pasos }}</td><td class="num">{{ r.fallos }}</td><td class="num">{{ r.tokens_in }}</td><td class="num">{{ r.tokens_out }}</td><td class="num">{{ r.costo_centavos }}</td><td class="num">{{ r.ms_medio }}</td><td class="muted">{{ r.modelos or "—" }} · {{ r.prompts or "—" }}</td></tr>{% else %}<tr><td colspan="8" class="muted">—</td></tr>{% endfor %}</tbody></table></div>
+  <h3><span class="i18n" data-l="es">Afirmaciones (eventos reales)</span><span class="i18n" data-l="en">Claims (real events)</span></h3>
+  <p class="small">{% for r in live.claims %}<span class="tag">{{ r.estado }}</span> {{ r.n }} {% else %}—{% endfor %}</p>
+  {% if live.last_claims_run %}<div class="tw"><table class="small"><thead><tr><th>run</th><th><span class="i18n" data-l="es">inicio</span><span class="i18n" data-l="en">start</span></th><th>estado</th><th class="num">¢</th><th><span class="i18n" data-l="es">resumen</span><span class="i18n" data-l="en">summary</span></th></tr></thead>
+  <tbody>{% for r in live.last_claims_run %}<tr><td>{{ r.id }}</td><td>{{ r.iniciado_en }}</td><td>{{ r.estado }}</td><td class="num">{{ r.costo_centavos }}</td><td class="muted">{% for k, v in r.resumen.items() %}{{ k }}={{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  <h3><span class="i18n" data-l="es">Ediciones</span><span class="i18n" data-l="en">Editions</span></h3>
+  <div class="tw"><table class="small"><thead><tr><th>n.º</th><th>estado</th><th><span class="i18n" data-l="es">semana</span><span class="i18n" data-l="en">week</span></th><th class="num"><span class="i18n" data-l="es">eventos</span><span class="i18n" data-l="en">events</span></th><th></th></tr></thead>
+  <tbody>{% for r in live.editions %}<tr><td>{{ r.numero }}</td><td>{{ r.estado }}</td><td>{{ r.semana_inicio }}</td><td class="num">{{ r.eventos }}</td><td>{% if r.es_demo %}<span class="who">demo</span>{% endif %}</td></tr>{% else %}<tr><td colspan="5" class="muted">—</td></tr>{% endfor %}</tbody></table></div>
+  {% for r in live.articles_week %}<p class="small"><span class="i18n" data-l="es">Últimos 7 días:</span><span class="i18n" data-l="en">Last 7 days:</span> {{ r.articulos }} <span class="i18n" data-l="es">artículos de</span><span class="i18n" data-l="en">articles from</span> {{ r.medios }} <span class="i18n" data-l="es">medios</span><span class="i18n" data-l="en">outlets</span>.</p>{% endfor %}
+  {% else %}
+  <p class="lead"><span class="i18n" data-l="es">Esta generación no tiene acceso a la base{% if live and live.error %} ({{ live.error }}){% endif %}. En <span class="tag">/admin/painel</span> la vista se llena con agregados de solo lectura. Qué se mide y dónde:</span><span class="i18n" data-l="en">This build has no database access{% if live and live.error %} ({{ live.error }}){% endif %}. At <span class="tag">/admin/painel</span> the view fills with read-only aggregates. What is measured and where:</span></p>
+  <ul class="dash">
+    <li><span class="tag">agent_run</span> — <span class="i18n" data-l="es">una fila por corrida: estado (ok, fallo, tope_gasto), costo, tope, resumen con la tasa de desacuerdo entre agentes.</span><span class="i18n" data-l="en">one row per run: state (ok, failure, spending cap), cost, cap, a summary with the agent disagreement rate.</span></li>
+    <li><span class="tag">agent_step</span> — <span class="i18n" data-l="es">cada llamada: modelo, versión de prompt, tokens, costo, duración, error.</span><span class="i18n" data-l="en">every call: model, prompt version, tokens, cost, duration, error.</span></li>
+    <li><span class="tag">review_item</span> — <span class="i18n" data-l="es">tamaño de la cola por tipo y estado.</span><span class="i18n" data-l="en">queue size by type and state.</span></li>
+    <li><span class="tag">chat_usage_daily</span> — <span class="i18n" data-l="es">preguntas, tokens, costo, rechazos del verificador y negativas por día.</span><span class="i18n" data-l="en">questions, tokens, cost, verifier rejections and refusals per day.</span></li>
+    <li><span class="i18n" data-l="es">Alertas de caída de ingesta por polo: en el registro del pipeline semanal (GitHub Actions).</span><span class="i18n" data-l="en">Per-pole ingestion drop alerts: in the weekly pipeline log (GitHub Actions).</span></li>
+  </ul>
+  {% endif %}
+  {% if d43 %}<p class="note small"><b><span class="i18n" data-l="es">Última medición registrada en los documentos</span><span class="i18n" data-l="en">Last measurement recorded in the docs</span> (<a href="{{ d43_url }}">{{ d43.id }}</a>):</b> {{ d43.text }}</p>{% endif %}
+  {{ foot("costos") }}
+</section>
+
+{# ============================================================ 11. Extender #}
+<section class="view" id="extender">
+  <h2>{{ u("extender") }}</h2>
+  {% for x in extender %}
+  <h3>{{ t(x.titulo) }}</h3>
+  <ol class="dash">{% for p in x.pasos %}<li>{{ t(p) }}</li>{% endfor %}</ol>
+  <p class="small">{% for l in x.links %}{{ code(l) }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {% endfor %}
+  <h3><span class="i18n" data-l="es">Mantener este panel</span><span class="i18n" data-l="en">Maintaining this panel</span></h3>
+  <p class="prose"><span class="i18n" data-l="es">El panel es parte de la definición de terminado. <code class="tag">python -m app.cli build-panel --check</code> falla si el código abre una corrida, un paso, un tipo de cola o una versión de prompt que no está en el registro, o si una referencia apunta a algo que ya no existe. El workflow <span class="tag">panel.yml</span> lo corre en cada push.</span><span class="i18n" data-l="en">The panel is part of the definition of done. <code class="tag">python -m app.cli build-panel --check</code> fails if the code opens a run, step, queue type or prompt version missing from the registry, or if a reference points to something that no longer exists. The <span class="tag">panel.yml</span> workflow runs it on every push.</span></p>
+  {{ foot("extender") }}
+</section>
+
+{# ============================================================ 12. Deuda #}
+<section class="view" id="deuda">
+  <h2>{{ u("deuda") }}</h2>
+  <p class="lead"><span class="i18n" data-l="es">La vista más importante para el traspaso: qué pide el encargo y el código no hace, qué hace el código distinto de lo pedido, y qué documentos están desactualizados.</span><span class="i18n" data-l="en">The most important view for the handoff: what the brief asks for and the code does not do, what the code does differently, and which documents are out of date.</span></p>
+
+  <h3><span class="i18n" data-l="es">Hallazgos al leer el código</span><span class="i18n" data-l="en">Findings from reading the code</span></h3>
+  {% for h in deuda.hallazgos %}
+  <div class="card" style="padding:12px 16px;border:1px solid var(--rule);border-radius:4px;margin:8px 0;background:var(--surface)">
+    <p><span class="sev {{ h.gravedad }}">{{ h.gravedad }}</span> <b>{{ t(h.titulo) }}</b></p>
+    <p class="prose">{{ t(h.detalle) }}</p>
+    <p class="small">{% for l in h.links %}{{ code(l) }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  </div>
+  {% endfor %}
+
+  <h3><span class="i18n" data-l="es">Especificado, no implementado</span><span class="i18n" data-l="en">Specified, not implemented</span></h3>
+  <div class="tw"><table>
+    <thead><tr><th><span class="i18n" data-l="es">Etapa o agente</span><span class="i18n" data-l="en">Stage or agent</span></th><th><span class="i18n" data-l="es">Estado</span><span class="i18n" data-l="en">Status</span></th><th><span class="i18n" data-l="es">Especificación</span><span class="i18n" data-l="en">Specification</span></th></tr></thead>
+    <tbody>
+    {% for s in deuda.stages_missing + deuda.stages_partial %}<tr><td><a href="#etapa-{{ s.id }}">{{ t(s.name) }}</a></td><td>{{ status(s.estado) }}</td><td class="small">{{ spec(s.spec) }}</td></tr>{% endfor %}
+    {% for a in deuda.agents_missing %}<tr><td><a href="#agente-{{ a.id }}">{{ t(a.name) }}</a> <span class="muted small">(<span class="i18n" data-l="es">agente</span><span class="i18n" data-l="en">agent</span>)</span></td><td>{{ status(a.estado) }}</td><td class="small">{{ spec(a.spec) }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  {% if deuda.status_table %}<details class="sub"><summary><span class="i18n" data-l="es">Estado de implementación según docs/agentes.md</span><span class="i18n" data-l="en">Implementation status per docs/agentes.md</span></summary>
+  <div class="tw"><table class="small"><thead><tr>{% for c in deuda.status_table[0] %}<th>{{ c }}</th>{% endfor %}</tr></thead><tbody>{% for r in deuda.status_table[1:] %}<tr>{% for c in r %}<td>{{ c|replace("`","") }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+  <p class="small muted"><a href="{{ deuda.agentes_url }}">docs/agentes.md</a></p></details>{% endif %}
+
+  <h3><span class="i18n" data-l="es">Compuertas sin conectar y tablas sin escritor</span><span class="i18n" data-l="en">Unwired gates and tables without a writer</span></h3>
+  <ul class="dash">{% for g, c in deuda.unwired %}<li><a href="#compuerta-{{ g.id }}">{{ t(g.name) }}</a>: {{ code(c) }} <span class="muted small"><span class="i18n" data-l="es">solo se llama desde pruebas</span><span class="i18n" data-l="en">only called from tests</span></span></li>{% endfor %}</ul>
+  <p class="small"><span class="i18n" data-l="es">Tablas que ningún código fuera de las semillas escribe:</span><span class="i18n" data-l="en">Tables no code outside the seeds writes:</span> {% for tb in deuda.never_written %}<a class="tag" href="#tabla-{{ tb }}">{{ tb }}</a> {% endfor %}</p>
+
+  <h3><span class="i18n" data-l="es">Implementado distinto del encargo</span><span class="i18n" data-l="en">Implemented differently from the brief</span></h3>
+  <p class="small muted"><span class="i18n" data-l="es">Cada decisión de docs/decisiones.md explica por qué. Las abiertas ([A confirmar]) van primero.</span><span class="i18n" data-l="en">Each decision in docs/decisiones.md explains why. Open ones ([A confirmar]) come first.</span></p>
+  <div class="tw"><table class="small"><tbody>
+  {% for d in deuda.decisions_open %}<tr><td><a href="{{ d.url }}">{{ d.id }}</a></td><td><span class="st parcial"><span class="i18n" data-l="es">abierta</span><span class="i18n" data-l="en">open</span></span></td><td><b>{{ d.title }}</b></td></tr>{% endfor %}
+  </tbody></table></div>
+  <details class="sub"><summary><span class="i18n" data-l="es">Todas las decisiones ({{ deuda.decisions_all|length }})</span><span class="i18n" data-l="en">All decisions ({{ deuda.decisions_all|length }})</span></summary>
+  <ul class="plain small">{% for d in deuda.decisions_all %}<li><a href="{{ d.url }}">{{ d.id }}</a> {{ d.title }}</li>{% endfor %}</ul></details>
+  {% if deuda.defaults %}<h4><span class="i18n" data-l="es">Valor por defecto en código ≠ valor desplegado</span><span class="i18n" data-l="en">Code default ≠ deployed value</span></h4>
+  <ul class="dash small">{% for x in deuda.defaults %}<li><code>{{ x.name }}</code>: <span class="i18n" data-l="es">código</span><span class="i18n" data-l="en">code</span> {{ x.default }} · render.yaml {{ x.render }} {% if x.url %}<a class="code" href="{{ x.url }}">{{ x.code[0].path }}:{{ x.code[0].line }}</a>{% endif %}</li>{% endfor %}</ul>
+  <p class="small muted"><span class="i18n" data-l="es">Quien corra el código en local sin estas variables usará el valor por defecto, no el de producción.</span><span class="i18n" data-l="en">Anyone running the code locally without these variables gets the default, not the production value.</span></p>{% endif %}
+
+  <h3><span class="i18n" data-l="es">Documentos desactualizados</span><span class="i18n" data-l="en">Out-of-date documents</span></h3>
+  <p class="prose"><span class="i18n" data-l="es">El encargo (secciones 1, 9, 10 y 12) aún describe Fly.io, la API de Anthropic y la región gru; el despliegue vigente es Render + Neon + GitHub Actions con Kimi (nota de octubre de 2026 en la sección 10). {% if not deuda.fly_toml %}fly.toml ya no existe.{% endif %} Estas menciones a Fly en el repositorio describen la arquitectura retirada:</span><span class="i18n" data-l="en">The brief (sections 1, 9, 10 and 12) still describes Fly.io, the Anthropic API and the gru region; the current deployment is Render + Neon + GitHub Actions with Kimi (October 2026 note in section 10). {% if not deuda.fly_toml %}fly.toml no longer exists.{% endif %} These Fly mentions in the repository describe the retired architecture:</span></p>
+  <ul class="plain small">{% for x in deuda.stale %}<li><a class="code" href="{{ x.url }}">{{ x.path }}:{{ x.line }}</a> <span class="muted">{{ x.text }}</span></li>{% endfor %}</ul>
+  {% if deuda.hardcoded %}<h4><span class="i18n" data-l="es">País fijo en código general</span><span class="i18n" data-l="en">Country hard-coded in general code</span></h4>
+  <ul class="plain small">{% for x in deuda.hardcoded %}<li><a class="code" href="{{ x.url }}">{{ x.path }}:{{ x.line }}</a> <span class="muted">{{ x.text }}</span></li>{% endfor %}</ul>{% endif %}
+  {{ foot("deuda") }}
+</section>
+
+{# ============================================================ 13. Glosario #}
+<section class="view" id="glosario">
+  <h2>{{ u("glosario") }}</h2>
+  <dl class="facts">
+  {% for g in glosario %}<dt>{{ g.termino }}</dt><dd>{{ t(g.def) }} <span class="small">{{ code(g.link) }}</span></dd>{% endfor %}
+  </dl>
+  <p class="small muted"><span class="i18n" data-l="es">Anotaciones redactadas por</span><span class="i18n" data-l="en">Annotations written by</span> {{ ann_meta.autor }} · {{ ann_meta.fecha }}.</p>
+  {{ foot("glosario") }}
+</section>
+</main>
+</div>
+<script type="application/json" id="idx">{{ index|tojson }}</script>
+<script>
+(function(){
+  var body=document.body,store=null;
+  try{store=window.localStorage}catch(e){}
+  function setLang(l){
+    body.classList.toggle("en",l==="en");
+    document.documentElement.lang=l;
+    document.querySelectorAll(".lang button").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.set===l))});
+    var q=document.getElementById("q");q.placeholder=q.dataset["ph"+(l==="en"?"En":"Es")];
+    try{store&&store.setItem("painel-lang",l)}catch(e){}
+  }
+  var p=new URLSearchParams(location.search).get("lang"),saved=null;
+  try{saved=store&&store.getItem("painel-lang")}catch(e){}
+  setLang(p||saved||"es");
+  document.querySelectorAll(".lang button").forEach(function(b){b.addEventListener("click",function(){setLang(b.dataset.set)})});
+  function openHash(){
+    if(!location.hash)return;
+    var el=document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if(!el)return;
+    var d=el.tagName==="DETAILS"?el:el.closest("details");
+    while(d){d.open=true;d=d.parentElement&&d.parentElement.closest("details")}
+    el.scrollIntoView({block:"start"});
+  }
+  window.addEventListener("hashchange",openHash);openHash();
+  var links={};document.querySelectorAll("nav.side a").forEach(function(a){links[a.dataset.v]=a});
+  if("IntersectionObserver" in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){for(var k in links)links[k].classList.toggle("on",k===e.target.id)}})},{rootMargin:"-10% 0px -80% 0px"});
+    document.querySelectorAll("section.view").forEach(function(s){io.observe(s)});
+  }
+  var idx=JSON.parse(document.getElementById("idx").textContent),q=document.getElementById("q"),res=document.getElementById("res");
+  function fold(s){return (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase()}
+  idx.forEach(function(i){i.f=fold(i.l+" "+i.e+" "+i.k)});
+  function show(){
+    var v=fold(q.value.trim());res.innerHTML="";
+    if(!v){res.hidden=true;return}
+    var hits=idx.filter(function(i){return i.f.indexOf(v)>=0}).slice(0,14),en=body.classList.contains("en");
+    hits.forEach(function(i){
+      var li=document.createElement("li"),a=document.createElement("a");a.href=i.h;
+      if(i.h.indexOf("http")===0){a.target="_blank";a.rel="noopener"}
+      var n=document.createElement("span");n.textContent=en&&i.e?i.e:i.l;
+      var k=document.createElement("span");k.className="k";k.textContent=i.k;
+      a.appendChild(n);a.appendChild(k);li.appendChild(a);res.appendChild(li);
+      a.addEventListener("click",function(){res.hidden=true});
+    });
+    res.hidden=!hits.length;
+  }
+  q.addEventListener("input",show);
+  q.addEventListener("keydown",function(e){if(e.key==="Enter"){var a=res.querySelector("a");if(a){a.click();if(a.target!=="_blank")location.hash=a.getAttribute("href")}}if(e.key==="Escape"){res.hidden=true}});
+  document.addEventListener("click",function(e){if(!e.target.closest(".search"))res.hidden=true});
+})();
+</script>
+</body>
+</html>
