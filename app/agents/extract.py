@@ -220,13 +220,26 @@ def extract_week(s: Session, country_id: str = "BR", monday: date | None = None,
                            .order_by(m.Event.impacto.desc()).limit(max_events)).all()
         for ev in events:
             existing = s.scalars(select(m.Claim).where(m.Claim.event_id == ev.id)).all()
-            if existing and not redo:
+            ev_articles = sorted(s.scalars(select(m.ArticleEvent.article_id).where(m.ArticleEvent.event_id == ev.id)))
+            seen = set((existing[0].verificacion or {}).get("articulos_evento") or []) if existing else set()
+            grew = bool(existing) and bool(seen) and bool(set(ev_articles) - seen)
+            if existing and not redo and not grew:
                 stats["eventos_ya_procesados"] += 1
                 continue
             if existing:
-                if any((c.verificacion or {}).get("editor") for c in existing):
+                approved = s.scalars(select(m.NeutralBrief.id).where(m.NeutralBrief.event_id == ev.id,
+                                                                     m.NeutralBrief.estado == "aprobada")).first()
+                if any((c.verificacion or {}).get("editor") for c in existing) or approved:
                     stats["eventos_con_decision_editor"] += 1
                     continue
+                if grew:
+                    stats["eventos_reextraidos_por_articulos_nuevos"] += 1
+                # Codes are reused (c{event}-{k}): any chronicle drafted from the old claims is now obsolete.
+                for b in s.scalars(select(m.NeutralBrief).where(m.NeutralBrief.event_id == ev.id,
+                                                                m.NeutralBrief.estado != "aprobada")):
+                    b.estado = "obsoleta"
+                s.execute(delete(m.Translation).where(m.Translation.source_tipo == "claim",
+                                                      m.Translation.source_id.in_([c.id for c in existing])))
                 ids = [c.id for c in existing]
                 # Their pending queue items would point at deleted claims: close them as superseded.
                 for it in s.scalars(select(m.ReviewItem).where(m.ReviewItem.target_tipo == "claim",
@@ -283,6 +296,7 @@ def extract_week(s: Session, country_id: str = "BR", monday: date | None = None,
                                               "verificador": {"modelo": run.settings.verifier_model, "prompt": VERIFY_VERSION,
                                                               "veredito": c.get("veredito"),
                                                               "motivo": c.get("motivo_verificador") or c.get("motivo_revision")},
+                                              "articulos_evento": ev_articles,
                                               "divergencias_postura": c.get("divergencias_postura") or [],
                                               "posturas_suavizadas": c.get("posturas_suavizadas") or [],
                                               "apoios_descartados": c.get("apoios_descartados") or []})

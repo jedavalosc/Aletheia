@@ -172,3 +172,44 @@ def test_discouraged_verbs_outside_quotes():
     assert discouraged_verbs("A campanha alegou que a CUT usou o perfil.", "pt") == ["alegou"]
     assert not discouraged_verbs('O deputado disse que "a campanha alegou mentiras".', "pt")
     assert discouraged_verbs("The campaign claimed the union misused the account.", "en") == ["claimed"]
+
+
+def test_rerun_later_in_week_keeps_worked_events_and_refreshes_them(demo_db, monkeypatch):
+    """A forced mid-week run followed by the Saturday run (D51)."""
+    from sqlalchemy import select
+    from app import models as m
+    from app.agents import base
+    from app.agents.cluster import cluster_week, current_monday, week_bounds
+    from app.agents.extract import extract_week
+    from app.db import session
+
+    with session() as s:
+        ev = s.scalars(select(m.Event).where(m.Event.slug == "t-draft")).one()
+        start, _ = week_bounds(current_monday())
+        before = set(s.scalars(select(m.ArticleEvent.article_id).where(m.ArticleEvent.event_id == ev.id)))
+        for c in s.scalars(select(m.Claim).where(m.Claim.event_id == ev.id)):
+            c.verificacion = {"articulos_evento": sorted(before)}
+        for b in s.scalars(select(m.NeutralBrief).where(m.NeutralBrief.event_id == ev.id)):
+            b.estado = "verificada"
+        o = s.scalars(select(m.Outlet).where(m.Outlet.es_ficticio.is_(False), m.Outlet.es_fuente_oficial.is_(False))).all()[5]
+        new = m.Article(outlet_id=o.id, url="https://ex.com/pec-new", titular="Senado marca votação da PEC 7",
+                        fecha_pub=start + timedelta(hours=30), hash_texto="pec-test-new", es_ficticio=False)
+        s.add(new)
+        s.flush()
+        out = cluster_week(s, "BR", current_monday(), use_model=False)
+        assert s.get(m.Event, ev.id) is not None  # not deleted although it is an agent candidate
+        after = set(s.scalars(select(m.ArticleEvent.article_id).where(m.ArticleEvent.event_id == ev.id)))
+        assert new.id in after and out["articulos_absorbidos"] >= 1
+
+        def fake_llm(self, st, system, user, prompt_version, json_mode=True, max_tokens=None, role="agent"):
+            st.modelo, st.prompt_version = "fake", prompt_version
+            if role == "verifier":
+                return {"verificacoes": [{"id": 1, "veredito": "confirmada", "apoios": [{"n": 1, "postura_correta": "afirma"}]}]}
+            return {"afirmacoes": [{"texto": "O Senado marcou a votação da PEC.", "tipo": "que",
+                                    "apoios": [{"n": 1, "postura": "afirma", "fragmento": "Senado marca votação da PEC"}]}]}
+
+        monkeypatch.setattr(base.Run, "llm", fake_llm)
+        res = extract_week(s, "BR", current_monday(), max_events=20)
+        assert res.get("eventos_reextraidos_por_articulos_nuevos", 0) >= 1
+        states = {b.estado for b in s.scalars(select(m.NeutralBrief).where(m.NeutralBrief.event_id == ev.id))}
+        assert "obsoleta" in states and "verificada" not in states

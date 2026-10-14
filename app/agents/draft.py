@@ -507,7 +507,7 @@ def draft_edition(s: Session, ed: m.Edition, event_ids: list[int] | None = None,
             if latest is not None and latest.estado == "aprobada" and event_ids is None:
                 stats["ya_aprobadas"] += 1
                 continue
-            if latest is not None and not redo and event_ids is None:
+            if latest is not None and not redo and event_ids is None and latest.estado != "obsoleta":
                 stats["ya_redactadas"] += 1
                 continue
             try:

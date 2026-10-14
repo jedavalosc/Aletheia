@@ -350,7 +350,8 @@ class NeutralBrief(Base):
     modelo: Mapped[str] = mapped_column(String(80))
     prompt_version: Mapped[str] = mapped_column(String(40))
     fecha: Mapped[datetime] = _now()
-    estado: Mapped[str] = mapped_column(String(20), default="borrador")  # borrador/verificada/aprobada/rechazada
+    # borrador/verificada/aprobada/rechazada/obsoleta (claims re-extracted after it was drafted)
+    estado: Mapped[str] = mapped_column(String(20), default="borrador")
     verificacion: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     sentences: Mapped[list["BriefSentence"]] = relationship(order_by="BriefSentence.orden")
 

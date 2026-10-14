@@ -237,6 +237,38 @@ def adjudicate(run: Run, st: m.AgentStep, titles: list[str]) -> dict:
     return run.llm(st, SYSTEM, listing, PROMPT_VERSION, json_mode=True, max_tokens=3000)
 
 
+def absorb_into_existing(s: Session, new: list, start) -> tuple[list, int]:
+    """Attach new articles to the week's kept events when their average similarity to the event's articles
+    passes the same average-linkage threshold used to form events. Returns the articles left over."""
+    rows = s.execute(select(m.ArticleEvent.event_id, m.Article).join(m.Article, m.Article.id == m.ArticleEvent.article_id)
+                     .join(m.Event, m.Event.id == m.ArticleEvent.event_id)
+                     .where(m.Event.semana_inicio == start, m.Event.fuera_de_alcance.is_(False))).all()
+    if not rows or not new:
+        return new, 0
+    old_arts = [a for _, a in rows]
+    docs = [tokens(f"{a.titular}. {a.resumen or ''}") for a in new + old_arts]
+    vecs = tfidf(docs)
+    sims = pairwise(vecs, [a.outlet_id for a in new + old_arts])
+    n = len(new)
+    by_event = defaultdict(list)
+    for k, (ev_id, _) in enumerate(rows):
+        by_event[ev_id].append(n + k)
+    left, absorbed = [], 0
+    for i, a in enumerate(new):
+        best, best_ev = 0.0, None
+        for ev_id, idx in by_event.items():
+            avg = sum(sims.get((i, j), 0.0) for j in idx) / len(idx)
+            if avg > best:
+                best, best_ev = avg, ev_id
+        if best_ev is not None and best >= LINK_AVG:
+            s.add(m.ArticleEvent(article_id=a.id, event_id=best_ev, score_similitud=round(best, 3), asignacion="auto"))
+            absorbed += 1
+        else:
+            left.append(a)
+    s.flush()
+    return left, absorbed
+
+
 def cluster_week(s: Session, country_id: str = "BR", monday: date | None = None, use_model: bool = True,
                  disparado_por: str = "cli") -> dict:
     monday = monday or current_monday()
@@ -253,17 +285,27 @@ def cluster_week(s: Session, country_id: str = "BR", monday: date | None = None,
             st.salida = {"articulos_semana": len(arts), "opinion_excluida": n_op,
                          "descartados_prefiltro_alcance": len(arts) - len(kept) - n_op}
             summary.update(st.salida)
-        # Rebuild the agent's candidates for this week; events the editor confirmed are kept.
+        # Rebuild the agent's candidates for this week. Kept: events the editor confirmed and events with
+        # downstream work (claims, a chronicle or a place in the edition) — a run earlier in the week (D51).
         with run.step("limpieza_candidatos") as st:
-            old = s.scalars(select(m.Event.id).where(m.Event.country_id == country_id, m.Event.origen == "agente",
-                                                     m.Event.estado == "candidato", m.Event.semana_inicio == start)).all()
+            cand = set(s.scalars(select(m.Event.id).where(m.Event.country_id == country_id, m.Event.origen == "agente",
+                                                          m.Event.estado == "candidato", m.Event.semana_inicio == start)))
+            worked = (set(s.scalars(select(m.Claim.event_id).where(m.Claim.event_id.in_(cand))))
+                      | set(s.scalars(select(m.NeutralBrief.event_id).where(m.NeutralBrief.event_id.in_(cand))))
+                      | set(s.scalars(select(m.EditionEvent.event_id).where(m.EditionEvent.event_id.in_(cand))))) if cand else set()
+            old = sorted(cand - worked)
             if old:
                 s.execute(delete(m.ArticleEvent).where(m.ArticleEvent.event_id.in_(old)))
                 s.execute(delete(m.Event).where(m.Event.id.in_(old)))
             locked = set(s.scalars(select(m.ArticleEvent.article_id).join(m.Event, m.Event.id == m.ArticleEvent.event_id)
                                    .where(m.Event.semana_inicio == start)).all())
             kept = [a for a in kept if a.id not in locked]
-            st.salida = {"candidatos_borrados": len(old), "articulos_en_eventos_confirmados": len(locked)}
+            st.salida = {"candidatos_borrados": len(old), "eventos_con_trabajo_conservados": len(worked),
+                         "articulos_en_eventos_conservados": len(locked)}
+        with run.step("absorcion") as st:
+            kept, absorbed = absorb_into_existing(s, kept, start)
+            st.salida = {"articulos_absorbidos": absorbed}
+            summary["articulos_absorbidos"] = absorbed
         with run.step("agrupamiento_similitud") as st:
             docs = [tokens(f"{a.titular}. {a.resumen or ''}") for a in kept]
             vecs = tfidf(docs)
