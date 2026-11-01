@@ -167,12 +167,27 @@ def variants(s: Session, v: m.Visual) -> list[dict]:
     return out
 
 
+def clear_event_visuals(s: Session, ed: m.Edition, ev: m.Event) -> None:
+    """Remove an event's visuals for this edition with every row that points to them. Called before coverage
+    is recomputed (marks reference coverage snapshots) and before the visuals are rebuilt (D55)."""
+    ids = list(s.scalars(select(m.Visual.id).where(m.Visual.event_id == ev.id, m.Visual.edition_id == ed.id)))
+    if not ids:
+        return
+    ctl = select(m.VisualControl.id).where(m.VisualControl.visual_id.in_(ids))
+    s.query(m.ControlUsage).filter(m.ControlUsage.control_id.in_(ctl)).delete(synchronize_session=False)
+    for model in (m.VisualControl, m.VisualMark, m.VisualEncoding, m.VisualJustification, m.VisualReview):
+        s.query(model).filter(model.visual_id.in_(ids)).delete(synchronize_session=False)
+    s.query(m.Translation).filter(m.Translation.source_tipo == "visual", m.Translation.source_id.in_(ids)
+                                  ).delete(synchronize_session=False)
+    s.query(m.Visual).filter(m.Visual.id.in_(ids)).delete(synchronize_session=False)
+    s.flush()
+
+
 def build_standard_visuals(s: Session, ed: m.Edition) -> None:
     tr = Tr(s)
     for ee in ed.events:
         ev = ee.event
-        s.query(m.VisualMark).filter(m.VisualMark.visual_id.in_(
-            select(m.Visual.id).where(m.Visual.event_id == ev.id, m.Visual.edition_id == ed.id))).delete(synchronize_session=False)
+        clear_event_visuals(s, ed, ev)
         axes = s.scalars(select(m.Cleavage).where(m.Cleavage.country_id == ev.country_id, m.Cleavage.activo.is_(True))
                          .order_by(m.Cleavage.orden)).all()
         principal = next(a for a in axes if a.tipo == "principal")

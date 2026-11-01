@@ -114,6 +114,8 @@ def compute_coverage(s: Session, edition: m.Edition, event: m.Event, cleavages: 
                      principal: m.Cleavage) -> None:
     """One closing snapshot per edition: the event itself and each claim
     (derived fact), per pole of every active axis. Flags only on the principal axis."""
+    from .visuals import clear_event_visuals  # marks point at snapshots: visuals go first, rebuilt afterwards
+    clear_event_visuals(s, edition, event)
     s.query(m.CoverageSnapshot).filter_by(edition_id=edition.id, event_id=event.id).delete()
     s.query(m.BlindspotFlag).filter_by(edition_id=edition.id, event_id=event.id).delete()
     active = active_outlets(s, edition)

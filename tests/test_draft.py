@@ -213,3 +213,24 @@ def test_rerun_later_in_week_keeps_worked_events_and_refreshes_them(demo_db, mon
         assert res.get("eventos_reextraidos_por_articulos_nuevos", 0) >= 1
         states = {b.estado for b in s.scalars(select(m.NeutralBrief).where(m.NeutralBrief.event_id == ev.id))}
         assert "obsoleta" in states and "verificada" not in states
+
+
+def test_rerunning_coverage_and_visuals_on_same_edition(demo_db):
+    """Production failure of 17/10: a second pipeline run over an edition that already had visuals (D55)."""
+    from sqlalchemy import func, select
+    from app import models as m
+    from app.analytics.core import run_event
+    from app.analytics.visuals import build_standard_visuals
+    from app.db import session
+
+    with session() as s:
+        ed = s.scalars(select(m.Edition).where(m.Edition.es_demo.is_(True))).first()
+        counts = []
+        for _ in range(2):
+            for ee in ed.events:
+                run_event(s, ed, ee.event)
+            build_standard_visuals(s, ed)
+            s.flush()
+            counts.append(s.scalar(select(func.count()).select_from(m.Visual).where(m.Visual.edition_id == ed.id)))
+        assert counts[0] == counts[1] > 0
+        s.rollback()
