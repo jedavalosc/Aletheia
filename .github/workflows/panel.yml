@@ -1,0 +1,26 @@
+# Handoff panel: fails when app/agents/registry.yaml or docs/panel/anotaciones.yaml drift from
+# the code (a new agent run, step, queue type or prompt version without an entry, or a reference
+# to a file or function that no longer exists). Builds the panel from the repository only
+# (no database) and keeps it as a workflow artifact for 30 days.
+name: panel
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  panel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13", cache: pip}
+      - run: pip install -r requirements.txt
+      - name: Check registry against code and build the panel
+        run: python -m app.cli build-panel --check --sem-dados --out build/panel/index.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: painel
+          path: build/panel/index.html
+          retention-days: 30

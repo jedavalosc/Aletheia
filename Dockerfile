@@ -13,6 +13,10 @@ COPY app ./app
 COPY scripts ./scripts
 COPY docs ./docs
 COPY evals ./evals
+# Read by the handoff panel (/admin/painel) to describe deployment, schedules and tests.
+COPY render.yaml README.md CONTRIBUTING.md .env.example ./
+COPY .github ./.github
+COPY tests ./tests
 
 RUN useradd --create-home --uid 10001 aletheia && mkdir -p /app/build && chown -R aletheia /app/build
 USER aletheia

@@ -527,6 +527,21 @@ def edit_event(ev_id: int, accion: str = Form(...), nome: str = Form(...), titul
     return _back(f"/admin/eventos?semana={wk}", "Evento atualizado.")
 
 
+_panel_cache: dict = {"at": 0.0, "html": None}
+
+
+@router.get("/painel", response_class=HTMLResponse)
+async def handoff_panel(fresh: bool = False, user: str = Depends(editor)):
+    """Didactic handoff panel (app/panel): generated from the repository plus read-only
+    aggregates from the database. Cached five minutes; ?fresh=1 rebuilds it."""
+    import time
+    from .panel.build import build_panel
+    if fresh or _panel_cache["html"] is None or time.monotonic() - _panel_cache["at"] > 300:
+        html, _ = await run_in_threadpool(build_panel, None, True)
+        _panel_cache.update(at=time.monotonic(), html=html)
+    return HTMLResponse(_panel_cache["html"], headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
+
+
 @router.post("/autonomia")
 def set_autonomy(nivel: int = Form(...), nome: str = Form(...), razon: str = Form(...), csrf: str = Form(...),
                  user: str = Depends(editor)):

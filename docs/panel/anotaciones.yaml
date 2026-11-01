@@ -1,0 +1,706 @@
+# Anotaciones del panel didáctico (/admin/painel).
+#
+# Aquí va solo lo que el código no puede decir: propósito, principio que protege, fallos
+# conocidos, procedimientos y glosario. Todo lo demás (archivos, funciones, tablas, modelos,
+# variables, horarios, pruebas) lo extrae app/panel del repositorio.
+# Cada `ref` se valida con `python -m app.cli build-panel --check`: si apunta a un archivo o
+# símbolo inexistente, la verificación falla.
+# Textos en {es, en}. Si falta `en`, el panel muestra el español con la marca "sin traducir".
+
+meta:
+  autor: "Claude (borrador para revisión del editor)"
+  fecha: "2026-10-14"
+  commit_base: "3aa398e"
+
+vision:
+  que_es:
+    es: >-
+      Aletheia News publica cada lunes una edición semanal de Brasil. Cada oración de la crónica
+      está enlazada a afirmaciones atómicas (claims) y a los fragmentos de los medios que las
+      respaldan; la cobertura se mide por polo político; un chat conversa solo con la edición publicada.
+    en: >-
+      Aletheia News publishes a weekly Brazil edition every Monday. Every sentence of the chronicle
+      links to atomic claims and to the outlet fragments that support them; coverage is measured per
+      political pole; a chat talks only about the published edition.
+  regla_central:
+    es: "Los agentes proponen, el código decide, el editor aprueba las excepciones."
+    en: "Agents propose, code decides, the editor approves the exceptions."
+  regla_central_ref: docs/agentes.md
+  principios:
+    - es: "La neutralidad se audita, no se genera: ninguna oración sin claim_id."
+      en: "Neutrality is audited, not generated: no sentence without a claim_id."
+      ref: app/rules/verifier.py::verify_sentence
+    - es: "Un punto ciego se observa, no se diagnostica como deliberado."
+      en: "A blind spot is observed, never diagnosed as deliberate."
+      ref: app/analytics/core.py::compute_coverage
+    - es: "El sesgo de un medio es una estimación con intervalo; nunca una etiqueta a mano."
+      en: "An outlet's bias is an estimate with an interval, never a hand-assigned label."
+      ref: app/models.py::OutletPosition
+    - es: "La interpretación es una capa separada y declara lo que no sabe."
+      en: "Interpretation is a separate layer and states what it does not know."
+      ref: app/rules/commentary.py::verify_commentary
+    - es: "Una infografía es una afirmación visual: ninguna marca sin respaldo."
+      en: "An infographic is a visual claim: no mark without support."
+      ref: app/rules/visual.py::verify_visual
+    - es: "El acento cultural es margen, nunca contenido."
+      en: "Cultural accent is margin, never content."
+      ref: app/rules/visual.py::verify_theme_colors
+    - es: "No inventar; todo dato de demostración se marca como ficticio."
+      en: "Invent nothing; all demo data is marked fictional."
+      ref: app/seed/demo_content.py
+  cadencia:
+    - cuando: {es: "Cada 2 horas, toda la semana", en: "Every 2 hours, all week"}
+      que: {es: "Recolección de titulares y resúmenes", en: "Collection of headlines and summaries"}
+      ref: .github/workflows/collect.yml
+    - cuando: {es: "Viernes 23:59 BRT", en: "Friday 23:59 BRT"}
+      que: {es: "Corte de ingesta de la edición", en: "Edition ingestion cutoff"}
+      ref: app/pipeline/weekly.py::week_window
+    - cuando: {es: "Sábado 03:00 BRT", en: "Saturday 03:00 BRT"}
+      que: {es: "Pipeline semanal: recolección final, agrupación, afirmaciones, cobertura, verificación, piezas", en: "Weekly pipeline: final collection, grouping, claims, coverage, verification, visuals"}
+      ref: .github/workflows/weekly-pipeline.yml
+    - cuando: {es: "Sábado y domingo", en: "Saturday and Sunday"}
+      que: {es: "Revisión del editor: cola de excepciones, eventos, crónicas, aprobación", en: "Editor review: exception queue, events, chronicles, approval"}
+      ref: app/admin.py::queue
+    - cuando: {es: "Lunes 06:00 BRT", en: "Monday 06:00 BRT"}
+      que: {es: "Publicación prevista; el sitio se regenera al aprobar", en: "Planned publication; the site rebuilds on approval"}
+      ref: app/admin.py::approve_edition_route
+  recorrido:
+    - titulo: {es: "Diseño del proceso agéntico", en: "Agentic process design"}
+      ref: docs/agentes.md
+      por_que: {es: "La regla central, la sustitución de roles y los niveles de autonomía.", en: "The central rule, role substitution and autonomy levels."}
+    - titulo: {es: "Registro de decisiones", en: "Decision log"}
+      ref: docs/decisiones.md
+      por_que: {es: "Por qué el código se aparta del encargo, decisión por decisión. Las marcadas [A confirmar] siguen abiertas.", en: "Why the code departs from the brief, decision by decision. Those marked [A confirmar] are still open."}
+    - titulo: {es: "Pipeline semanal", en: "Weekly pipeline"}
+      ref: app/pipeline/weekly.py::run
+      por_que: {es: "Orquesta todas las etapas; ciento cincuenta líneas que muestran el orden real.", en: "Orchestrates every stage; 150 lines that show the real order."}
+    - titulo: {es: "Verificador de oraciones", en: "Sentence verifier"}
+      ref: app/rules/verifier.py::verify_sentence
+      por_que: {es: "La compuerta que define la plataforma: qué puede publicarse.", en: "The gate that defines the platform: what may be published."}
+    - titulo: {es: "Agente de afirmaciones", en: "Claims agent"}
+      ref: app/agents/extract.py::extract_week
+      por_que: {es: "El ejemplo completo de agente + compuertas + verificador + cola.", en: "The complete example of agent + gates + checker + queue."}
+
+etapas:
+  recoleccion:
+    proposito:
+      es: "Guarda titular, enlace, fecha y resumen del RSS o sitemap de cada medio. Nunca el cuerpo del artículo."
+      en: "Stores headline, link, date and the feed summary from each outlet's RSS or sitemap. Never the article body."
+    principio: {es: "Derechos de autor y robots.txt; sin recolección frecuente habría falsos puntos ciegos (D29).", en: "Copyright and robots.txt; without frequent collection there would be false blind spots (D29)."}
+    fallos:
+      - es: "Un feed deja de responder: tras 3 fallos seguidos aparece 'fuente_fallando' en la cola."
+        en: "A feed stops responding: after 3 failures in a row 'fuente_fallando' appears in the queue."
+      - es: "GZH y Band no tienen fuente utilizable; están declarados como vacío en feeds_br.json."
+        en: "GZH and Band have no usable source; declared as a gap in feeds_br.json."
+        ref: app/seed/feeds_br.json
+  embeddings_entidades:
+    proposito:
+      es: "El encargo pide embeddings y entidades con pgvector. No existe: Kimi no ofrece embeddings y un modelo local no cabe en el plan gratuito (D30)."
+      en: "The brief asks for embeddings and entities with pgvector. Not built: Kimi offers no embeddings and a local model does not fit the free plan (D30)."
+    principio: {es: "Calidad de la agrupación.", en: "Grouping quality."}
+    fallos: []
+  agrupacion:
+    proposito:
+      es: "Agrupa los artículos de la semana en eventos candidatos (TF-IDF + enlace promedio) y un agente revisa cada grupo: confirma, retira titulares ajenos, propone título neutral, sección y alcance."
+      en: "Groups the week's articles into candidate events (TF-IDF + average linkage); an agent reviews each group: confirms, drops stray headlines, proposes a neutral title, section and scope."
+    principio: {es: "Los errores de agrupación contaminan todo lo posterior.", en: "Grouping errors contaminate everything downstream."}
+    fallos:
+      - es: "Un nombre propio frecuente encadena noticias distintas; el enlace promedio lo mitiga (D30) y los grupos grandes con baja cohesión van a la cola."
+        en: "A frequent proper name chains unrelated stories; average linkage mitigates it (D30) and large low-cohesion groups go to the queue."
+      - es: "Sin clave o con el tope alcanzado, el título y la sección salen de reglas deterministas."
+        en: "Without a key or at the spending cap, title and section come from deterministic rules."
+  revision_eventos:
+    proposito:
+      es: "El editor confirma, fusiona, retira artículos o marca fuera de alcance. Los eventos confirmados sobreviven a nuevas agrupaciones."
+      en: "The editor confirms, merges, removes articles or marks out of scope. Confirmed events survive later regroupings."
+    principio: {es: "Fusión y división manual por editores (encargo §6).", en: "Manual merge and split by editors (brief §6)."}
+    fallos:
+      - es: "No hay acción para dividir un grupo en dos; solo retirar artículos uno a uno."
+        en: "There is no action to split a group in two; only removing articles one by one."
+        ref: app/admin.py::edit_event
+  seleccion_eventos_edicion:
+    proposito:
+      es: "Arma la edición: entran los eventos de la semana dentro del alcance con al menos tres afirmaciones aceptadas, por impacto, hasta doce. Nunca retira un evento ya incluido (D44)."
+      en: "Assembles the edition: the week's in-scope events with at least three accepted claims enter, by impact, up to twelve. It never removes an event already included (D44)."
+    principio: {es: "Cada edición tiene 6 a 12 eventos; preferir menos y mejor revisados (encargo §3).", en: "Each edition has 6 to 12 events; fewer, better-reviewed ones preferred (brief §3)."}
+    fallos:
+      - es: "Con menos de seis eventos que califican, la cola avisa (edicao_curta) y la compuerta de publicación bloquea."
+        en: "With fewer than six qualifying events, the queue warns (edicao_curta) and the publication gate blocks."
+      - es: "El impacto mide amplitud de cobertura, no importancia (D33): el orden de portada hereda esa aproximación."
+        en: "Impact measures breadth of coverage, not importance (D33): cover order inherits that approximation."
+  extraccion_afirmaciones:
+    proposito:
+      es: "Un agente extrae afirmaciones atómicas de titulares y resúmenes, con fragmento literal y postura por artículo; otro modelo las verifica sin usar conocimiento propio."
+      en: "An agent extracts atomic claims from headlines and summaries, with a verbatim fragment and stance per article; another model checks them without using its own knowledge."
+    principio: {es: "Nada se acepta sin el verificador (D38); el modelo no puede inventar respaldo.", en: "Nothing is accepted without the checker (D38); the model cannot invent support."}
+    fallos:
+      - es: "El extractor completa resúmenes cortados por el medio ('influenciado principalmente pela…'); el verificador lo detecta y va a revisión (D43)."
+        en: "The extractor completes summaries truncated by the outlet; the checker catches it and it goes to review (D43)."
+      - es: "Con razonamiento activado, kimi-k3 agota max_tokens sin responder; por eso va apagado (D40)."
+        en: "With reasoning on, kimi-k3 exhausts max_tokens without answering; that is why it is off (D40)."
+        ref: app/config.py::_thinking
+      - es: "Extractor y verificador son del mismo proveedor: sus errores pueden estar correlacionados (D36)."
+        en: "Extractor and checker share a provider: their errors may be correlated (D36)."
+  posicion_medios:
+    proposito:
+      es: "Estimar la posición de cada medio por eje con intervalo de confianza, por dos agentes anotadores y medida de acuerdo. Sin esto, ningún medio tiene polo."
+      en: "Estimate each outlet's position per axis with a confidence interval, by two annotator agents with an agreement measure. Without it, no outlet has a pole."
+    principio: {es: "El sesgo es una estimación, nunca una etiqueta a mano.", en: "Bias is an estimate, never a hand label."}
+    fallos:
+      - es: "Mientras no exista, toda afirmación entra atribuida y no hay banderas de punto ciego en ediciones reales (D39)."
+        en: "Until it exists, every claim is attributed and real editions have no blind-spot flags (D39)."
+  seleccion:
+    proposito:
+      es: "Decide si cada afirmación aceptada entra como hecho llano, atribuida o excluida."
+      en: "Decides whether each accepted claim enters as a plain fact, attributed, or excluded."
+    principio: {es: "Hecho llano solo con dos polos o fuente primaria verificable.", en: "Plain fact only with two poles or a verifiable primary source."}
+    fallos:
+      - es: "Un medio cuyo intervalo cruza el cero no pertenece a ningún polo (D6); con pocos medios estimados, casi todo queda atribuido."
+        en: "An outlet whose interval crosses zero belongs to no pole (D6); with few estimated outlets, almost everything stays attributed."
+  cobertura:
+    proposito:
+      es: "Calcula, por polo y eje, qué parte de los medios activos cubrió el evento y cada hecho derivado; levanta banderas de punto ciego en el eje principal."
+      en: "Computes, per pole and axis, the share of active outlets covering the event and each derived fact; raises blind-spot flags on the principal axis."
+    principio: {es: "El denominador siempre escrito; la bandera es una observación.", en: "The denominator is always written; a flag is an observation."}
+    fallos:
+      - es: "Umbrales provisionales (40 puntos, impacto ≥ 60) sin calibrar con datos reales (D8)."
+        en: "Provisional thresholds (40 points, impact ≥ 60) not yet calibrated on real data (D8)."
+      - es: "WhatsApp, YouTube y radio no se ingieren: vacío declarado en country.data_gaps."
+        en: "WhatsApp, YouTube and radio are not ingested: declared gap in country.data_gaps."
+        ref: app/seed/brasil.py
+  encuadre:
+    proposito:
+      es: "Prepara la vista tríptica: titulares por polo y lo que cada enfoque no menciona."
+      en: "Prepares the triptych view: headlines per pole and what each framing leaves out."
+    principio: {es: "Mostrar el encuadre sin juzgar intención.", en: "Show framing without judging intent."}
+    fallos:
+      - es: "Escribe framing_summary; la tabla framing_annotation (términos cargados por artículo, marco, carga emocional) del encargo no se llena."
+        en: "Writes framing_summary; the brief's framing_annotation table (loaded terms per article, frame, emotional charge) is never filled."
+        ref: app/models.py::FramingAnnotation
+  redaccion:
+    proposito:
+      es: "El redactor escribe título y crónica en portugués solo desde las afirmaciones aceptadas, con claim_ids por oración. El código verifica cada oración y otro modelo juzga si dice algo que sus afirmaciones no dicen. Hasta dos reparaciones; la oración que sigue fallando se elimina."
+      en: "The drafter writes the title and chronicle in Portuguese only from accepted claims, with claim_ids per sentence. Code verifies every sentence and another model judges whether it says anything its claims do not. Up to two repairs; a sentence that keeps failing is dropped."
+    principio: {es: "Generación condicionada, no reescritura libre: una idea sin afirmación no entra en el texto.", en: "Constrained generation, not free rewriting: an idea without a claim does not enter the text."}
+    fallos:
+      - es: "Si falla el título o el lide, o quedan menos de dos oraciones, la crónica se rechaza entera y va a la cola."
+        en: "If the title or lead fails, or fewer than two sentences remain, the whole chronicle is rejected and queued."
+      - es: "El verificador de fidelidad objetó dos veces una oración correcta desde memoria vieja, siempre contra un mismo lado; una regla en código anula esas objeciones cuando la oración es literal a sus afirmaciones (D47). Es un parche: la solución está diseñada en docs/revisor-local.md."
+        en: "The faithfulness checker twice objected to a correct sentence from stale memory, always against the same side; a code rule overrides such objections when the sentence is literal to its claims (D47). It is a patch: the fix is designed in docs/revisor-local.md."
+        ref: app/agents/draft.py::literal_to_claims
+      - es: "Si una cifra central no sobrevivió al paso 3, la crónica sale sin ella (caso IPCA, D50); la cola avisa con cobertura_incompleta."
+        en: "If a central figure did not survive step 3, the chronicle goes out without it (IPCA case, D50); the queue warns with cobertura_incompleta."
+        ref: app/agents/draft.py::central_numbers_missing
+      - es: "Sin posiciones de medios (paso 5), todo es atribuido, también el título: se atribuye al hablante o 'dizem veículos', nunca a un solo medio (D46)."
+        en: "Without outlet positions (step 5), everything is attributed, titles included: to the speaker or 'dizem veículos', never to a single outlet (D46)."
+  verificacion_cronica:
+    proposito:
+      es: "Revisa cada oración en PT, ES y EN: claim_id existente, del evento y aceptado; atribución con verbo de habla; términos cargados; números presentes en las afirmaciones citadas; cifras en disputa; fórmulas de certeza y verbos desaconsejados; traducción con los mismos claim_ids."
+      en: "Checks every sentence in PT, ES and EN: claim_id exists, belongs to the event and was accepted; attribution with a speech verb; loaded terms; numbers present in the cited claims; disputed figures; certainty formulas and discouraged verbs; translation with the same claim_ids."
+    principio: {es: "Ninguna oración publicada sin respaldo trazable.", en: "No published sentence without traceable support."}
+    fallos:
+      - es: "Falsos positivos de términos ('taxa de ocupação hospitalar') bloquean la oración; costo aceptado (D11)."
+        en: "Loaded-term false positives ('taxa de ocupação hospitalar') block the sentence; accepted cost (D11)."
+  revision_adversarial:
+    proposito:
+      es: "Sustituye la revisión por pares: el encargo pide un revisor adversarial en otro proveedor; el diseño vigente es un revisor local multidisciplinar con base de conocimiento fechada, rúbricas firmadas y calibración contra especialistas. Sin implementar."
+      en: "Stands in for peer review: the brief asks for an adversarial reviewer on another provider; the current design is a local multidisciplinary reviewer with a dated knowledge base, signed rubrics and calibration against specialists. Not implemented."
+    principio: {es: "Sin evidencia, no hay objeción: toda objeción cita una afirmación o una entrada fechada de la base local.", en: "No evidence, no objection: every objection cites a claim or a dated local knowledge-base entry."}
+    fallos: []
+  piezas_visuales:
+    proposito:
+      es: "Genera las piezas estándar (cobertura, punto ciego, cifras por fuente, serie) con fuente, corte y denominador dentro de la imagen, y las verifica."
+      en: "Builds the standard pieces (coverage, blind spot, figures by source, series) with source, cutoff and denominator inside the image, and verifies them."
+    principio: {es: "Una infografía es una afirmación visual.", en: "An infographic is a visual claim."}
+    fallos: []
+  traduccion:
+    proposito:
+      es: "Una llamada por lengua (ES, EN) traduce título, oraciones y afirmaciones. Los claim_ids los copia el código desde el portugués; el verificador corre otra vez con los términos cargados de cada lengua (D49)."
+      en: "One call per language (ES, EN) translates title, sentences and claims. The code copies claim_ids from the Portuguese; the verifier runs again with each language's loaded terms (D49)."
+    principio: {es: "Tres lenguas, con el método visible al lector: 'máquina sin revisar' hasta que el editor la revise.", en: "Three languages, with the method visible to the reader: 'machine, unreviewed' until the editor reviews it."}
+    fallos:
+      - es: "Si el editor edita una oración en portugués, sus traducciones se descartan y se rehacen; la crónica queda rechazada hasta que pasen."
+        en: "If the editor edits a Portuguese sentence, its translations are discarded and redone; the chronicle stays rejected until they pass."
+        ref: app/admin.py::edit_sentence
+  capa_academica:
+    proposito:
+      es: "Esquema y reglas completos (planos, estatus, escalas, 'O que não sabemos'); solo la demostración tiene comentarios. El agente de literatura no existe y verify_commentary no se llama fuera de las pruebas."
+      en: "Full schema and rules (planes, status, scales, 'What we don't know'); only the demo has commentaries. The literature agent does not exist and verify_commentary is not called outside tests."
+    principio: {es: "El modelo nunca redacta enunciados explicativos ni normativos (restricción en base de datos).", en: "The model never writes explanatory or normative statements (database constraint)."}
+    fallos: []
+  aprobacion:
+    proposito:
+      es: "El editor aprueba crónicas y la edición. edition_gates bloquea si falta algo: rango de eventos, crónica aprobada, inclusión excepcional confirmada, piezas verificadas."
+      en: "The editor approves chronicles and the edition. edition_gates blocks if anything is missing: event range, approved chronicle, confirmed exceptional inclusion, verified visuals."
+    principio: {es: "Nivel de autonomía 1: nada se publica sin el editor.", en: "Autonomy level 1: nothing publishes without the editor."}
+    fallos:
+      - es: "El nivel de autonomía se guarda, pero ningún código actúa distinto en el nivel 2 o 3."
+        en: "The autonomy level is stored, but no code behaves differently at level 2 or 3."
+        ref: app/admin.py::set_autonomy
+  sitio:
+    proposito:
+      es: "Genera HTML estático en /pt, /es, /en desde las ediciones publicadas; se regenera al arrancar, al aprobar y cada dos minutos si otra instancia publicó."
+      en: "Builds static HTML under /pt, /es, /en from published editions; rebuilt on start, on approval, and every two minutes if another instance published."
+    principio: {es: "Sitio estático, ligero, con fecha de corte en toda página.", en: "Static, light site with the cutoff date on every page."}
+    fallos:
+      - es: "El tope de 300 KB solo lo comprueba una prueba; el generador no bloquea una página pesada."
+        en: "The 300 KB cap is only checked by a test; the generator does not block a heavy page."
+  transparencia:
+    proposito:
+      es: "Página pública 'Como esta edição foi feita' con agentes, modelos, compuertas, costo e intervenciones humanas. Pendiente; los datos ya existen en agent_run y agent_step."
+      en: "Public page 'How this edition was made' with agents, models, gates, cost and human interventions. Pending; the data already exists in agent_run and agent_step."
+    principio: {es: "Transparencia del proceso agéntico.", en: "Transparency of the agentic process."}
+    fallos: []
+  chat:
+    proposito:
+      es: "Responde preguntas sobre una edición publicada: recupera documentos del corpus (BM25), el modelo responde en segmentos tipados, el código verifica, un reintento, y si falla, respuesta extractiva."
+      en: "Answers questions about a published edition: retrieves corpus documents (BM25), the model answers in typed segments, code verifies, one retry, and on failure an extractive answer."
+    principio: {es: "La IA conversa con la edición, no con internet ni con su opinión.", en: "The AI talks with the edition, not the internet or its own opinion."}
+    fallos:
+      - es: "Preguntas enmarcadas desde polos opuestos aún pueden recibir hechos distintos (solapamiento 0 en un par); pendiente de lectura ciega humana."
+        en: "Questions framed from opposite poles can still get different facts (overlap 0 in one pair); pending human blind reading."
+        ref: README.md
+  arranque_pais:
+    proposito:
+      es: "Un agente redacta, con fuentes, medios, ejes y términos cargados de un país nuevo, para firma del editor. Pendiente."
+      en: "An agent drafts, with sources, outlets, axes and loaded terms for a new country, for the editor to sign. Pending."
+    principio: {es: "Proceso general, no brasileño.", en: "A general process, not a Brazilian one."}
+    fallos: []
+
+agentes:
+  agente_evento:
+    sin_modelo: {es: "Reglas deterministas: sección por palabras clave y el titular más central como título.", en: "Deterministic rules: section by keywords and the most central headline as title."}
+    tarea: {es: "Confirmar que un grupo es un solo evento, retirar titulares ajenos, proponer título neutral, sección y alcance temático con su razón.", en: "Confirm a group is one event, drop stray headlines, propose a neutral title, section and thematic scope with its reason."}
+  extractor:
+    tarea: {es: "Extraer hasta 12 afirmaciones atómicas por evento, cada una con fragmentos literales y postura por artículo.", en: "Extract up to 12 atomic claims per event, each with verbatim fragments and a stance per article."}
+  verificador_afirmaciones:
+    tarea: {es: "Confirmar, matizar o rechazar cada afirmación solo contra los textos, sin conocimiento propio (D42).", en: "Confirm, qualify or reject each claim only against the texts, without its own knowledge (D42)."}
+  chat:
+    sin_modelo: {es: "Respuesta extractiva verificada con el mismo código (offline_answer).", en: "Extractive answer verified by the same code (offline_answer)."}
+    tarea: {es: "Responder sobre la edición en segmentos tipados (fato, cobertura, interpretacao, metodologia, sem_informacao, esclarecimento).", en: "Answer about the edition in typed segments (fact, coverage, interpretation, methodology, no-information, clarification)."}
+  redactor:
+    tarea: {es: "Escribir título y crónica en portugués (pirámide invertida, registro de agencia) solo desde las afirmaciones aceptadas del evento, con claim_ids por oración; reparar ante la lista de problemas.", en: "Write the Portuguese title and chronicle (inverted pyramid, agency register) only from the event's accepted claims, with claim_ids per sentence; repair against the list of problems."}
+    sin_modelo: {es: "No hay redacción sin modelo: el evento queda sin crónica y la edición no puede aprobarse.", en: "No drafting without a model: the event has no chronicle and the edition cannot be approved."}
+  verificador_fidelidad:
+    tarea: {es: "Juzgar, oración por oración, si el texto dice algo que sus afirmaciones no dicen. Tiene prohibido usar conocimiento propio (D47).", en: "Judge, sentence by sentence, whether the text says anything its claims do not. It may not use its own knowledge (D47)."}
+  traductor:
+    tarea: {es: "Traducir título, oraciones y afirmaciones al español y al inglés en registro de agencia, sin tocar los claim_ids.", en: "Translate title, sentences and claims into Spanish and English in agency register, without touching claim_ids."}
+  anotador_posicion:
+    tarea: {es: "Dos agentes independientes codifican la posición de cada medio; se mide su acuerdo (alfa de Krippendorff) y el editor codifica una muestra mensual.", en: "Two independent agents code each outlet's position; their agreement is measured (Krippendorff's alpha) and the editor codes a monthly sample."}
+  revisor_adversarial:
+    tarea: {es: "Revisar cada crónica con lentes disciplinarias (jurídica, económica, lingüística…) citando solo afirmaciones o la base de conocimiento local fechada; diseño en docs/revisor-local.md.", en: "Review each chronicle through disciplinary lenses (legal, economic, linguistic…) citing only claims or the dated local knowledge base; design in docs/revisor-local.md."}
+  agente_literatura:
+    limite: {es: "Solo busca y atribuye literatura publicada y revisada por pares; nunca redacta enunciados explicativos ni normativos.", en: "Only finds and attributes published peer-reviewed literature; never writes explanatory or normative statements."}
+    tarea: {es: "Buscar literatura revisada por pares y presentarla atribuida a sus autores. Nunca redacta enunciados explicativos ni normativos propios.", en: "Find peer-reviewed literature and present it attributed to its authors. Never writes its own explanatory or normative statements."}
+  agente_arranque_pais:
+    tarea: {es: "Proponer la configuración de un país nuevo con fuentes, para firma del editor.", en: "Propose a new country's configuration with sources, for the editor to sign."}
+
+compuertas:
+  robots_ritmo: {regla: {es: "Solo se pide lo que robots.txt permite a AletheiaNewsBot, como máximo una petición por segundo por dominio.", en: "Only what robots.txt allows AletheiaNewsBot is fetched, at most one request per second per domain."}, al_fallar: {es: "Fuente omitida y registrada en agent_step (estado \"omitido\").", en: "Source skipped and logged in agent_step (state \"omitido\")."}}
+  solo_titular_resumen: {regla: {es: "Del feed solo se guardan titular, enlace, fecha y un resumen de hasta 400 caracteres.", en: "From the feed only headline, link, date and a summary up to 400 characters are stored."}, al_fallar: {es: "No aplica: el recolector nunca descarga el cuerpo.", en: "Not applicable: the collector never downloads the body."}}
+  prefiltro_alcance_opinion: {regla: {es: "Columnas, blogs y opinión no forman eventos; deportes y farándula se descartan salvo excepción.", en: "Columns, blogs and opinion do not form events; sports and celebrity are dropped unless exceptional."}, al_fallar: {es: "El artículo queda fuera de la agrupación (sigue en la base).", en: "The article is left out of grouping (it stays in the database)."}}
+  titulo_sin_terminos: {regla: {es: "Un título de evento con término cargado sin atribución va a la cola; en el panel se rechaza.", en: "An event title with an unattributed loaded term goes to the queue; the panel rejects it."}, al_fallar: {es: "Ítem en la cola (titulo_cargado) o rechazo al confirmar en el panel.", en: "Queue item (titulo_cargado), or rejection when confirming in the panel."}}
+  compuertas_afirmaciones: {regla: {es: "Un apoyo vale solo si su fragmento es copia literal del titular o resumen; la afirmación necesita un apoyo que afirme, sin números ausentes de los fragmentos ni términos cargados.", en: "A support counts only if its fragment is a verbatim copy of the headline or summary; the claim needs an affirming support, no numbers missing from the fragments, and no loaded terms."}, al_fallar: {es: "Afirmación descartada; el motivo queda en agent_step.salida.", en: "Claim dropped; the reason is stored in agent_step.salida."}}
+  fusion_verificador: {regla: {es: "Aceptada solo si el verificador confirma sin divergencias; 'afirma' contra 'matiza' se resuelve hacia 'matiza'; 'contradice' o 'no relacionado' manda a revisión.", en: "Accepted only if the checker confirms with no divergence; 'affirms' vs 'qualifies' resolves to 'qualifies'; 'contradicts' or 'unrelated' sends it to review."}, al_fallar: {es: "Afirmación en revisión (cola) o rechazada.", en: "Claim goes to review (queue) or is rejected."}}
+  regla_seleccion: {regla: {es: "Hecho llano si lo afirman medios de dos polos del eje principal o una fuente primaria verificada; si no, atribuido; sin apoyo que afirme, excluido.", en: "Plain fact if outlets from two poles of the principal axis or a verified primary source affirm it; otherwise attributed; with no affirming support, excluded."}, al_fallar: {es: "La afirmación entra atribuida o excluida, nunca como hecho llano.", en: "The claim enters attributed or excluded, never as a plain fact."}}
+  cifras_en_disputa: {regla: {es: "Misma medida con valores distintos: siempre atribuida, y la oración debe dar cada valor con su fuente.", en: "Same measure with different values: always attributed, and the sentence must give each value with its source."}, al_fallar: {es: "Oración rechazada (cifra_colapsada, cifra_sin_fuente).", en: "Sentence rejected (cifra_colapsada, cifra_sin_fuente)."}}
+  verificador_oraciones: {regla: {es: "Rechaza oraciones sin claim_id; con claim inexistente, de otro evento, excluido o no aceptado; que citan una afirmación atribuida sin verbo de habla; con un número que no está en las afirmaciones citadas (2,3 bilhões = 2.300 millones); con fórmula de certeza o verbo desaconsejado ('alegou').", en: "Rejects sentences without a claim_id; with a missing, foreign, excluded or unaccepted claim; citing an attributed claim without a speech verb; with a number absent from the cited claims (2.3 billion = 2,300 million); with a certainty formula or discouraged verb ('alegou')."}, al_fallar: {es: "La crónica queda en estado \"rechazada\" y la edición no puede aprobarse. Los motivos por oración e idioma se ven en /admin/edicao/{id} y en python -m app.cli status.", en: "The chronicle ends in state \"rechazada\" and the edition cannot be approved. Per-sentence, per-language reasons are shown at /admin/edicao/{id} and by python -m app.cli status."}}
+  terminos_cargados: {regla: {es: "Un término de la lista solo puede aparecer atribuido o entre comillas; algunos, solo entre comillas.", en: "A listed term may appear only attributed or in quotes; some only in quotes."}, al_fallar: {es: "Oración rechazada (termino_cargado).", en: "Sentence rejected (termino_cargado)."}}
+  regla_literal: {regla: {es: "Una objeción del verificador de fidelidad se anula si todas las palabras de contenido de la oración vienen de sus afirmaciones (y en el mismo orden si cita una sola); nunca anula negaciones, inversión de roles ni actores añadidos.", en: "A faithfulness objection is overridden if every content word of the sentence comes from its claims (in the same order if it cites one); it never overrides negation, role reversal or added actors."}, al_fallar: {es: "La anulación queda en la cola (veredito_anulado) para el editor.", en: "The override is queued (veredito_anulado) for the editor."}}
+  umbral_punto_ciego: {regla: {es: "Bandera si la diferencia de cobertura entre polos es ≥ 40 puntos en un evento de impacto ≥ 60, solo en el eje principal.", en: "Flag if the coverage gap between poles is ≥ 40 points in an event with impact ≥ 60, on the principal axis only."}, al_fallar: {es: "No aplica: decide si se levanta la bandera.", en: "Not applicable: it decides whether a flag is raised."}}
+  alerta_ingesta: {regla: {es: "Si los medios activos de un polo caen por debajo del 60% de la edición anterior, se registra una alerta: puede ser falla técnica, no punto ciego.", en: "If a pole's active outlets drop below 60% of the previous edition, an alert is logged: it may be a technical failure, not a blind spot."}, al_fallar: {es: "Error en el registro del pipeline; no bloquea.", en: "Error in the pipeline log; does not block."}}
+  verificador_visual: {regla: {es: "Cada marca enlaza a claim, dataset o snapshot; barras desde cero; colores de polo equivalentes; texto alternativo con el hallazgo; pie con fuente, corte y denominador; menos de 150 KB.", en: "Every mark links to a claim, dataset or snapshot; bars start at zero; equivalent pole colors; alt text states the finding; footer with source, cutoff and denominator; under 150 KB."}, al_fallar: {es: "Pieza no verificada; bloquea la aprobación de la edición.", en: "Visual not verified; blocks edition approval."}}
+  reglas_academicas: {regla: {es: "2–5 preguntas abiertas, 3 disciplinas de 2 familias, un enunciado por escala, tope de hipótesis 1 de 5, sin fórmulas de certeza; explicativo y normativo solo de autoría humana.", en: "2–5 open questions, 3 disciplines from 2 families, one statement per scale, hypothesis cap 1 in 5, no certainty formulas; explanatory and normative only by humans."}, al_fallar: {es: "La restricción de base impide guardar; la función devuelve la lista de problemas.", en: "The database constraint refuses the row; the function returns the problem list."}}
+  filtro_tematico: {regla: {es: "Un evento de deportes o farándula necesita razón de inclusión (restricción en base) y confirmación del editor para aprobar la edición.", en: "A sports or celebrity event needs an inclusion reason (database constraint) and editor confirmation before the edition can be approved."}, al_fallar: {es: "La edición no se puede aprobar hasta que el editor confirme la razón.", en: "The edition cannot be approved until the editor confirms the reason."}}
+  compuertas_edicion: {regla: {es: "La edición se aprueba solo con 6–12 eventos, todas las crónicas aprobadas, inclusiones confirmadas y piezas verificadas.", en: "The edition is approved only with 6–12 events, all chronicles approved, inclusions confirmed and visuals verified."}, al_fallar: {es: "Aprobación rechazada con la lista de problemas.", en: "Approval refused with the list of problems."}}
+  verificador_chat: {regla: {es: "Cada hecho cita claims de la edición y sus números aparecen en ellas; cobertura e interpretación citan su documento; nada de interpretación en Modo Factual Puro.", en: "Every fact cites edition claims whose numbers it uses; coverage and interpretation cite their document; no interpretation in Pure Factual Mode."}, al_fallar: {es: "El modelo recibe los motivos y reintenta una vez; si vuelve a fallar, respuesta extractiva.", en: "The model gets the reasons and retries once; if it fails again, an extractive answer."}}
+  presupuesto_chat: {regla: {es: "Límite de preguntas por IP y hora y presupuesto diario en centavos; al agotarse, respuesta extractiva.", en: "Per-IP hourly limit and a daily budget in cents; when exhausted, extractive answers."}, al_fallar: {es: "Modo sin conexión (respuesta extractiva) o 429 por IP.", en: "Offline mode (extractive answer) or 429 per IP."}}
+  tope_gasto: {regla: {es: "Cada corrida de agentes tiene un tope en centavos (AGENT_BUDGET_CENTS_PER_RUN; la redacción, AGENT_BUDGET_CENTS_DRAFT); al alcanzarlo se detiene limpia en estado 'tope_gasto'.", en: "Each agent run has a cap in cents (AGENT_BUDGET_CENTS_PER_RUN; drafting, AGENT_BUDGET_CENTS_DRAFT); when reached it stops cleanly in state 'tope_gasto'."}, al_fallar: {es: "La corrida termina en estado \"tope_gasto\"; la agrupación sigue con reglas deterministas.", en: "The run ends in state \"tope_gasto\"; grouping continues with deterministic rules."}}
+  peso_pagina: {regla: {es: "Página de crónica por debajo de 300 KB, fuentes incluidas.", en: "Chronicle page under 300 KB, fonts included."}, al_fallar: {es: "Solo falla la prueba; el generador no bloquea.", en: "Only the test fails; the generator does not block."}}
+
+cola:
+  fuente_fallando:
+    significa: {es: "Una fuente falló tres corridas seguidas.", en: "A source failed three runs in a row."}
+    resolver: {es: "Abrir el feed a mano; si cambió, corregir app/seed/feeds_br.json y volver a sembrar. Marcar resuelto con la causa.", en: "Open the feed manually; if it changed, fix app/seed/feeds_br.json and reseed. Mark resolved with the cause."}
+  fuente_sin_novedades:
+    significa: {es: "Un medio con fuentes no trajo nada nuevo en 48 horas.", en: "An outlet with sources brought nothing new in 48 hours."}
+    resolver: {es: "Comprobar si el medio publica; si no, descartar. Si el feed está congelado, tratar como fuente_fallando.", en: "Check whether the outlet publishes; if not, dismiss. If the feed is frozen, treat as fuente_fallando."}
+  agrupacion_dudosa:
+    significa: {es: "El agente dice que el grupo mezcla eventos, o un grupo grande tiene baja cohesión.", en: "The agent says the group mixes events, or a large group has low cohesion."}
+    resolver: {es: "En Eventos da semana: retirar artículos, fusionar o confirmar.", en: "In Eventos da semana: remove articles, merge or confirm."}
+  titulo_cargado:
+    significa: {es: "El título provisional contiene un término cargado sin atribución.", en: "The provisional title contains an unattributed loaded term."}
+    resolver: {es: "Reescribir el título al confirmar el evento.", en: "Rewrite the title when confirming the event."}
+  alcance_excepcional:
+    significa: {es: "El agente propone incluir un evento de deportes o farándula.", en: "The agent proposes including a sports or celebrity event."}
+    resolver: {es: "Aceptar la razón (confirmar inclusión) o marcar fuera de alcance.", en: "Accept the reason (confirm inclusion) or mark out of scope."}
+  agente_sin_respuesta:
+    significa: {es: "El modelo no respondió para un evento grande; título y sección vienen de reglas.", en: "The model did not answer for a large event; title and section come from rules."}
+    resolver: {es: "Revisar título y sección del evento.", en: "Review the event's title and section."}
+  afirmacion_en_revision:
+    significa: {es: "Extractor y verificador discrepan, o el verificador confirmó solo en parte.", en: "Extractor and checker disagree, or the checker only partly confirmed."}
+    resolver: {es: "En la Fila: leer los fragmentos y marcar la afirmación aceptada o rechazada; la regla de selección se recalcula.", en: "In the queue: read the fragments and mark the claim accepted or rejected; the selection rule is recomputed."}
+  verificacao_ausente:
+    significa: {es: "El verificador no respondió: ninguna afirmación del evento se aceptó.", en: "The checker did not answer: no claim from the event was accepted."}
+    resolver: {es: "Volver a correr extract con --refazer para esa semana, o revisar las afirmaciones una por una.", en: "Rerun extract with --refazer for that week, or review the claims one by one."}
+
+  edicao_curta:
+    significa: {es: "Menos de seis eventos de la semana tienen al menos tres afirmaciones aceptadas.", en: "Fewer than six of the week's events have at least three accepted claims."}
+    resolver: {es: "Revisar en la Fila las afirmaciones en revisión de eventos casi completos, o aceptar una edición corta (la compuerta de publicación bloquea hasta seis).", en: "Review pending claims of nearly complete events in the queue, or accept a short edition (the publication gate blocks below six)."}
+  cronica_sem_afirmacoes:
+    significa: {es: "Un evento de la edición no tiene afirmaciones aceptadas suficientes para redactar.", en: "An edition event lacks enough accepted claims to draft."}
+    resolver: {es: "Resolver sus afirmaciones en la Fila o retirarlo en Eventos da semana.", en: "Resolve its claims in the queue or remove it in Eventos da semana."}
+  cobertura_incompleta:
+    significa: {es: "Un número del título provisional no está en ninguna afirmación aceptada: la crónica puede omitir el dato central.", en: "A number in the provisional title is in no accepted claim: the chronicle may omit the central figure."}
+    resolver: {es: "Buscar la afirmación con esa cifra (quizá rechazada o en revisión) y decidir; luego redactar de nuevo.", en: "Find the claim with that figure (perhaps rejected or pending) and decide; then redraft."}
+  cronica_rejeitada:
+    significa: {es: "Falló el título o el lide, o quedaron menos de dos oraciones tras las reparaciones.", en: "The title or lead failed, or fewer than two sentences remained after repairs."}
+    resolver: {es: "En /admin/edicao/{id}: redactar de nuevo con una instrucción, o editar oraciones a mano; luego aprobar.", en: "At /admin/edicao/{id}: redraft with an instruction, or edit sentences by hand; then approve."}
+  fidelidade_ausente:
+    significa: {es: "El verificador de fidelidad no respondió: la crónica no se marca como verificada.", en: "The faithfulness checker did not answer: the chronicle is not marked verified."}
+    resolver: {es: "Redactar de nuevo cuando el proveedor responda, o revisar cada oración contra sus afirmaciones antes de aprobar.", en: "Redraft once the provider answers, or check each sentence against its claims before approving."}
+  oracoes_descartadas:
+    significa: {es: "Oraciones eliminadas porque siguieron fallando tras dos reparaciones.", en: "Sentences dropped because they kept failing after two repairs."}
+    resolver: {es: "Leer qué se perdió (está en los datos del ítem) y decidir si la crónica queda completa.", en: "Read what was lost (in the item data) and decide whether the chronicle is still complete."}
+  veredito_anulado:
+    significa: {es: "La regla literal anuló una objeción del verificador de fidelidad (D47).", en: "The literal rule overrode a faithfulness objection (D47)."}
+    resolver: {es: "Confirmar que la oración dice solo lo que sus afirmaciones dicen; si no, editarla.", en: "Confirm the sentence says only what its claims say; if not, edit it."}
+
+autonomia:
+  subir: {es: "Al menos cuatro ediciones reales seguidas con rechazos del verificador estables o en baja, desacuerdo entre agentes bajo el umbral, pocas correcciones, disputas aceptadas y simetría en lectura ciega.", en: "At least four consecutive real editions with stable or falling verifier rejections, agent disagreement under threshold, few corrections, accepted disputes and blind-reading symmetry."}
+  bajar: {es: "Inmediato ante un error grave.", en: "Immediate after a serious error."}
+  electoral: {es: "No pasar del nivel 1 durante la segunda vuelta electoral (25/10/2026) ni sin opinión jurídica.", en: "Do not go above level 1 during the election runoff (25/10/2026) or without a legal opinion."}
+  ref: docs/agentes.md
+
+tablas:
+  outlet_position: {es: "Histórico versionado: nunca se sobrescribe; el intervalo debe contener el puntaje (restricción).", en: "Versioned history: never overwritten; the interval must contain the score (constraint)."}
+  claim_support: {es: "Postura solo afirma / contradice / matiza (restricción). El fragmento es copia literal del medio.", en: "Stance only affirms / contradicts / qualifies (constraint). The fragment is a verbatim copy from the outlet."}
+  coverage_snapshot: {es: "Medios que cubren ≤ medios activos del polo (restricción): el denominador nunca miente.", en: "Covering outlets ≤ active outlets in the pole (constraint): the denominator never lies."}
+  commentary_statement: {es: "Hipótesis solo en plano explicativo y con mecanismo y refutación; explicativo y normativo solo de autoría humana (restricciones).", en: "Hypotheses only in the explanatory plane, with mechanism and refutation; explanatory and normative only by humans (constraints)."}
+  commentary: {es: "Solo comentario de fondo (restricción, D14).", en: "Background commentary only (constraint, D14)."}
+  translation: {es: "Método humano / máquina revisada / máquina sin revisar; si no es 'sin revisar', debe tener revisor (restricción).", en: "Method human / machine reviewed / machine unreviewed; unless unreviewed, it must have a reviewer (constraint)."}
+  event: {es: "Una inclusión excepcional exige razón (restricción).", en: "An exceptional inclusion requires a reason (constraint)."}
+  agent_step: {es: "Procedencia de cada paso: modelo, versión de prompt, entrada, salida, tokens, costo, duración.", en: "Provenance of every step: model, prompt version, input, output, tokens, cost, duration."}
+  review_item: {es: "Cola de excepciones; se deduplica por tipo y objetivo mientras esté pendiente.", en: "Exception queue; deduplicated by type and target while pending."}
+  chat_session: {es: "Sin identificador persistente; se borra a los 30 días (CHAT_RETENTION_DAYS).", en: "No persistent identifier; deleted after 30 days (CHAT_RETENTION_DAYS)."}
+  reference: {es: "verificada_en obligatorio antes de publicar.", en: "verificada_en required before publishing."}
+
+chat:
+  reglas:
+    - texto: {es: "Todo hecho cita claim_ids; sin cita, el verificador devuelve la respuesta al modelo.", en: "Every fact cites claim_ids; without one the verifier sends the answer back to the model."}
+      eval: [factual]
+      ref: app/chat/verify.py::verify_answer
+    - texto: {es: "Separa hecho, interpretación académica y metodología.", en: "Separates fact, academic interpretation and methodology."}
+      eval: [metodologia, academico, cobertura]
+      ref: app/chat/verify.py::TYPES
+    - texto: {es: "Si la edición no lo dice, lo dice e indica la fecha de corte.", en: "If the edition does not say it, it says so and gives the cutoff date."}
+      eval: [sin_respuesta]
+      ref: app/chat/service.py::NO_ANSWER_THRESHOLD
+    - texto: {es: "Sin intenciones, predicciones ni opinión normativa.", en: "No intentions, predictions or normative opinion."}
+      eval: [opinion]
+      ref: app/chat/prompt.py::SYSTEM
+    - texto: {es: "Misma exigencia para ambos polos; un dato nuevo del lector se registra como sugerencia.", en: "Same standard for both poles; a reader's new fact is logged as a suggestion."}
+      eval: [cargada_polo]
+      ref: app/chat/service.py::handle
+    - texto: {es: "Léxico neutral; no adopta términos cargados del lector.", en: "Neutral vocabulary; does not adopt the reader's loaded terms."}
+      eval: [cargada_polo]
+      ref: app/rules/loaded_terms.py::violations
+    - texto: {es: "Responde en PT, ES o EN.", en: "Answers in PT, ES or EN."}
+      eval: []
+      ref: app/main.py::chat
+    - texto: {es: "Modo Factual Puro: solo crónica y cobertura.", en: "Pure Factual Mode: chronicle and coverage only."}
+      eval: [modo_factual]
+      ref: app/chat/verify.py::verify_answer
+    - texto: {es: "Ignora instrucciones dentro del corpus o del mensaje.", en: "Ignores instructions inside the corpus or the message."}
+      eval: [inyeccion]
+      ref: app/chat/prompt.py::SYSTEM
+  resultados:
+    es: "Última evaluación registrada: 70 preguntas con kimi-k3, 100% de oraciones factuales con cita válida y 100% de negativas correctas; pendiente la lectura ciega de los pares enmarcados (README)."
+    en: "Last recorded evaluation: 70 questions with kimi-k3, 100% of factual sentences with valid citations and 100% correct refusals; blind reading of framed pairs still pending (README)."
+    ref: README.md
+
+infra:
+  servicios:
+    - nombre: Render
+      que: {es: "Servicio web (sitio, API, chat, panel) desde el Dockerfile; plan gratuito, región Virginia, despliegue en cada commit.", en: "Web service (site, API, chat, panel) from the Dockerfile; free plan, Virginia region, deploys on every commit."}
+      ref: render.yaml
+    - nombre: Neon
+      que: {es: "Postgres 16, plan gratuito, AWS us-east-1, conexión agrupada (pooler).", en: "Postgres 16, free plan, AWS us-east-1, pooled connection."}
+      ref: README.md
+    - nombre: GitHub Actions
+      que: {es: "Recolección cada 2 horas, pipeline semanal y pruebas.", en: "Collection every 2 hours, weekly pipeline and tests."}
+      ref: .github/workflows/weekly-pipeline.yml
+    - nombre: Moonshot (Kimi)
+      que: {es: "Proveedor de modelos del chat y de los agentes, por API compatible con OpenAI.", en: "Model provider for chat and agents, through an OpenAI-compatible API."}
+      ref: app/llm.py::complete
+    - nombre: aletheia-news.org
+      que: {es: "Dominio público (PUBLIC_BASE_URL).", en: "Public domain (PUBLIC_BASE_URL)."}
+      ref: render.yaml
+  limites:
+    - es: "Render gratuito se duerme tras 15 minutos sin visitas; el siguiente visitante espera cerca de un minuto. Disco efímero: el sitio se regenera desde la base."
+      en: "Render free sleeps after 15 idle minutes; the next visitor waits about a minute. Ephemeral disk: the site is rebuilt from the database."
+      ref: README.md
+    - es: "En un repositorio privado, la recolección cada 2 horas consume del cupo gratuito de minutos de Actions (D29)."
+      en: "In a private repository, collecting every 2 hours uses the free Actions minutes quota (D29)."
+      ref: docs/decisiones.md
+    - es: "Precios del modelo provisionales: el costo registrado y el tope dependen de AGENT_PRICE_* y CHAT_PRICE_* (D34)."
+      en: "Model prices are provisional: recorded cost and the cap depend on AGENT_PRICE_* and CHAT_PRICE_* (D34)."
+      ref: app/config.py::Settings
+
+runbook:
+  - id: demo_local
+    titulo: {es: "Levantar el sistema en local con la edición de demostración", en: "Run the system locally with the demo edition"}
+    soporte: si
+    pasos:
+      - {es: "Con Docker: cp .env.example .env y definir ADMIN_PASSWORD; docker compose up --build -d (Postgres con pgvector + web en http://localhost:8080; el arranque aplica las migraciones).", en: "With Docker: cp .env.example .env and set ADMIN_PASSWORD; docker compose up --build -d (Postgres with pgvector + web at http://localhost:8080; startup applies the migrations)."}
+      - {es: "docker compose exec web python -m app.cli seed-brasil, luego seed-demo. La edición queda en revisión.", en: "docker compose exec web python -m app.cli seed-brasil, then seed-demo. The edition stays in review."}
+      - {es: "Sin Docker: Python 3.12+ y Postgres 16 con una base vacía (createdb aletheia); pip install -r requirements.txt; export DATABASE_URL=postgresql://usuario@localhost:5432/aletheia ADMIN_PASSWORD=… (postgresql:// sirve: el código lo pasa al driver psycopg); python -m app.cli migrate; python -m app.cli seed-brasil; python -m app.cli seed-demo; ./scripts/start.sh (vuelve a migrar, es idempotente). No hace falta clave de modelo: sin ella el chat responde en modo extractivo.", en: "Without Docker: Python 3.12+ and Postgres 16 with an empty database (createdb aletheia); pip install -r requirements.txt; export DATABASE_URL=postgresql://user@localhost:5432/aletheia ADMIN_PASSWORD=… (postgresql:// is fine: the code switches it to the psycopg driver); python -m app.cli migrate; python -m app.cli seed-brasil; python -m app.cli seed-demo; ./scripts/start.sh (migrates again, idempotent). No model key needed: without one the chat answers in extractive mode."}
+      - {es: "http://localhost:8080/admin (usuario editor): aprobar las tres crónicas con tu nombre, confirmar la inclusión excepcional del evento de apuestas y aprobar la edición; el sitio se regenera y queda en http://localhost:8080/pt/. Atajo: seed-demo --aprovar-como \"Nombre\" (tras reset-demo si ya estaba cargada).", en: "http://localhost:8080/admin (user editor): approve the three chronicles with your name, confirm the betting event's exceptional inclusion and approve the edition; the site rebuilds and is served at http://localhost:8080/pt/. Shortcut: seed-demo --aprovar-como \"Name\" (after reset-demo if already loaded)."}
+      - {es: "python -m app.cli status muestra, por evento, el estado de la crónica, la verificación por idioma, las banderas y los bloqueos de aprobación.", en: "python -m app.cli status shows, per event, the chronicle state, per-language verification, flags and approval blockers."}
+      - {es: "La demostración ya recorre selección, cobertura, verificador y piezas al sembrarse. El pipeline semanal (python -m app.pipeline.weekly --forcar) trabaja sobre la semana real en curso, no sobre la demostración, y necesita red para recolectar; sin clave de modelo la agrupación usa reglas y ni la extracción ni la redacción producen nada.", en: "The demo already goes through selection, coverage, the verifier and visuals when seeded. The weekly pipeline (python -m app.pipeline.weekly --forcar) works on the current real week, not the demo, and needs the network to collect; without a model key grouping uses rules and neither extraction nor drafting produces anything."}
+    refs: [README.md, docker-compose.yml, scripts/start.sh, app/seed/demo.py, app/status.py::status]
+  - id: cronica_rechazada
+    titulo: {es: "Una crónica rechazada por el verificador", en: "A chronicle rejected by the verifier"}
+    soporte: parcial
+    pasos:
+      - {es: "Dónde verlo: /admin/edicao/{id} lista, por idioma, cada oración rechazada con su código (sin_claim, claim_inexistente, claim_de_otro_evento, claim_excluido, claim_no_aceptado, falta_atribucion, termino_cargado, numero_sin_respaldo, cifra_colapsada, cifra_sin_fuente, formula_certeza, verbo_desaconsejado, traduccion_faltante_o_claims_distintos). python -m app.cli status da lo mismo en JSON. Si el rechazo ocurrió al redactar, también hay un ítem cronica_rejeitada en la cola.", en: "Where to see it: /admin/edicao/{id} lists, per language, each rejected sentence with its code (sin_claim, claim_inexistente, claim_de_otro_evento, claim_excluido, claim_no_aceptado, falta_atribucion, termino_cargado, numero_sin_respaldo, cifra_colapsada, cifra_sin_fuente, formula_certeza, verbo_desaconsejado, traduccion_faltante_o_claims_distintos). python -m app.cli status gives the same as JSON. If the rejection happened during drafting, there is also a cronica_rejeitada item in the queue."}
+      - {es: "Si es un falso positivo de término cargado (D11): ajustar o cerrar el término en /admin/termos y pulsar \"verificar de novo\" en la crónica.", en: "If it is a loaded-term false positive (D11): adjust or close the term at /admin/termos and press \"verificar de novo\" on the chronicle."}
+      - {es: "Si no: editar la oración en portugués en /admin/edicao/{id} (texto y claim_ids); sus traducciones se rehacen y la crónica se verifica de nuevo. O 'redigir de novo' con una instrucción para el redactor, que hace hasta dos reparaciones.", en: "Otherwise: edit the Portuguese sentence at /admin/edicao/{id} (text and claim_ids); its translations are redone and the chronicle is verified again. Or 'redigir de novo' with an instruction for the drafter, which makes up to two repairs."}
+    refs: [app/admin.py::reverify, app/admin.py::edit_sentence, app/admin.py::redraft, app/rules/verifier.py::verify_sentence, app/status.py::status]
+  - id: correr_pipeline
+    titulo: {es: "Correr el pipeline a mano", en: "Run the pipeline manually"}
+    soporte: si
+    pasos:
+      - {es: "GitHub → Actions → weekly-pipeline → Run workflow; marcar 'forcar' si es fuera del sábado a lunes 06:00 BRT.", en: "GitHub → Actions → weekly-pipeline → Run workflow; tick 'forcar' if outside Saturday to Monday 06:00 BRT."}
+      - {es: "En local: DATABASE_URL=… python -m app.pipeline.weekly --forcar", en: "Locally: DATABASE_URL=… python -m app.pipeline.weekly --forcar"}
+      - {es: "Ver el resultado en /admin/corridas.", en: "Check the result in /admin/corridas."}
+    refs: [.github/workflows/weekly-pipeline.yml, app/pipeline/weekly.py::run]
+  - id: correr_etapa
+    titulo: {es: "Correr una etapa sola", en: "Run a single stage"}
+    soporte: si
+    pasos:
+      - {es: "python -m app.cli collect | cluster --semana AAAA-MM-DD | extract --semana AAAA-MM-DD [--refazer] | draft --semana AAAA-MM-DD [--eventos ID…] [--refazer] [--instrucao \"…\"]", en: "python -m app.cli collect | cluster --semana YYYY-MM-DD | extract --semana YYYY-MM-DD [--refazer] | draft --semana YYYY-MM-DD [--eventos ID…] [--refazer] [--instrucao \"…\"]"}
+      - {es: "El pipeline es incremental (D51): una corrida forzada a mitad de semana y la del sábado conviven; la segunda conserva eventos con trabajo y solo rehace lo que ganó artículos.", en: "The pipeline is incremental (D51): a forced mid-week run and the Saturday run coexist; the second keeps events with work and only redoes those that gained articles."}
+      - {es: "cluster --sem-modelo usa solo reglas (sin costo).", en: "cluster --sem-modelo uses rules only (no cost)."}
+    refs: [app/cli.py::main]
+  - id: reanudar_tope
+    titulo: {es: "Reanudar una corrida detenida por tope de gasto", en: "Resume a run stopped at the spending cap"}
+    soporte: parcial
+    pasos:
+      - {es: "La corrida queda en estado 'tope_gasto' en /admin/corridas. Los eventos ya procesados se guardaron (commit por evento).", en: "The run shows state 'tope_gasto' in /admin/corridas. Events already processed were saved (commit per event)."}
+      - {es: "Subir AGENT_BUDGET_CENTS_PER_RUN si hace falta y volver a correr extract para la misma semana: salta los eventos que ya tienen afirmaciones.", en: "Raise AGENT_BUDGET_CENTS_PER_RUN if needed and rerun extract for the same week: it skips events that already have claims."}
+      - {es: "No hay botón de reanudar; la agrupación vuelve a crear los candidatos no confirmados.", en: "There is no resume button; grouping rebuilds unconfirmed candidates."}
+    refs: [app/agents/base.py::agent_run, app/agents/extract.py::extract_week]
+  - id: resolver_cola
+    titulo: {es: "Resolver la cola de excepciones", en: "Work the exception queue"}
+    soporte: si
+    pasos:
+      - {es: "/admin/fila, ordenada por prioridad. Cada ítem dice qué y por qué.", en: "/admin/fila, ordered by priority. Each item says what and why."}
+      - {es: "Resolver con nombre y nota; en afirmaciones, elegir aceptada o rechazada.", en: "Resolve with name and note; for claims, choose accepted or rejected."}
+    refs: [app/admin.py::queue, app/admin.py::resolve_item]
+  - id: aprobar_publicar
+    titulo: {es: "Aprobar y publicar una edición", en: "Approve and publish an edition"}
+    soporte: parcial
+    pasos:
+      - {es: "/admin → la edición → aprobar cada crónica con su nombre, confirmar inclusiones, marcar traducciones revisadas.", en: "/admin → the edition → approve each chronicle with your name, confirm inclusions, mark translations reviewed."}
+      - {es: "Aprobar la edición: si alguna compuerta falla, la lista de problemas aparece y no se publica.", en: "Approve the edition: if any gate fails, the problem list appears and nothing publishes."}
+      - {es: "Desde el paso 4 la edición real se arma y se redacta sola; con menos de seis eventos la aprobación bloquea (edicao_curta en la cola).", en: "Since step 4 the real edition is assembled and drafted automatically; with fewer than six events approval blocks (edicao_curta in the queue)."}
+    refs: [app/admin.py::approve_edition_route, app/editorial.py::edition_gates]
+  - id: correccion
+    titulo: {es: "Publicar una corrección como versión visible", en: "Publish a correction as a visible version"}
+    soporte: parcial
+    pasos:
+      - {es: "En /admin/edicao/{id}, 'redigir de novo' crea la versión N+1 de la crónica (una aprobada no se edita: se redacta otra versión) y hay que volver a aprobar.", en: "At /admin/edicao/{id}, 'redigir de novo' creates version N+1 of the chronicle (an approved one is not edited: a new version is drafted) and it must be approved again."}
+      - {es: "El sitio muestra la versión vigente, pero su bloque de historial solo lista una línea: el lector no ve qué cambió entre versiones.", en: "The site shows the current version, but its history block lists only one line: the reader cannot see what changed between versions."}
+    refs: [app/admin.py::redraft, app/site/templates/event.html]
+  - id: revertir
+    titulo: {es: "Retirar una edición publicada", en: "Withdraw a published edition"}
+    soporte: "no"
+    pasos:
+      - {es: "No hay acción en el panel. Hoy exige cambiar edition.estado en la base y regenerar el sitio (python -m app.cli build-site). Documentar en human_review.", en: "No panel action. Today it requires changing edition.estado in the database and rebuilding the site (python -m app.cli build-site). Record it in human_review."}
+    refs: [app/site/build.py::published_editions]
+  - id: rotar_clave
+    titulo: {es: "Rotar una clave", en: "Rotate a key"}
+    soporte: si
+    pasos:
+      - {es: "Crear la nueva clave en Moonshot; actualizar CHAT_API_KEY en Render (Environment) y en GitHub (Settings → Secrets → Actions); revocar la vieja.", en: "Create the new key at Moonshot; update CHAT_API_KEY in Render (Environment) and GitHub (Settings → Secrets → Actions); revoke the old one."}
+      - {es: "DATABASE_URL: rotar en Neon y actualizar los mismos dos lugares. ADMIN_PASSWORD: solo Render.", en: "DATABASE_URL: rotate in Neon and update the same two places. ADMIN_PASSWORD: Render only."}
+    refs: [render.yaml, .github/workflows/weekly-pipeline.yml]
+  - id: anadir_medio
+    titulo: {es: "Añadir un medio", en: "Add an outlet"}
+    soporte: parcial
+    pasos:
+      - {es: "Añadir el medio en app/seed/brasil.py (sin posición) y sus fuentes en app/seed/feeds_br.json; comprobar robots.txt.", en: "Add the outlet in app/seed/brasil.py (without position) and its sources in app/seed/feeds_br.json; check robots.txt."}
+      - {es: "La recolección siembra en cada corrida (seed-brasil en collect.yml). No hay pantalla en el panel.", en: "Collection reseeds on every run (seed-brasil in collect.yml). There is no panel screen."}
+    refs: [app/seed/brasil.py, app/seed/feeds_br.json, app/agents/collect.py::sync_feeds]
+  - id: terminos
+    titulo: {es: "Editar la lista de términos cargados", en: "Edit the loaded-terms list"}
+    soporte: si
+    pasos:
+      - {es: "/admin/termos: añadir con equivalencias ES/EN o cerrar la vigencia de uno (no se borra).", en: "/admin/termos: add with ES/EN equivalents or end the validity of one (never deleted)."}
+    refs: [app/admin.py, app/models.py::LoadedTerm]
+  - id: autonomia
+    titulo: {es: "Cambiar el nivel de autonomía", en: "Change the autonomy level"}
+    soporte: parcial
+    pasos:
+      - {es: "/admin → nivel de autonomía, con nombre y razón; queda en human_review y la metodología lo publica.", en: "/admin → autonomy level, with name and reason; it is logged in human_review and the methodology publishes it."}
+      - {es: "El nivel aún no cambia el comportamiento del pipeline.", en: "The level does not yet change pipeline behaviour."}
+    refs: [app/admin.py::set_autonomy]
+
+extender:
+  - titulo: {es: "Añadir un agente", en: "Add an agent"}
+    pasos:
+      - {es: "Abrir una corrida con agent_run(s, tipo, país) y cada paso con run.step(nombre).", en: "Open a run with agent_run(s, type, country) and each step with run.step(name)."}
+      - {es: "Llamar al modelo solo con run.llm(..., prompt_version): registra modelo, tokens y costo y respeta el tope.", en: "Call the model only through run.llm(..., prompt_version): it logs model, tokens and cost and respects the cap."}
+      - {es: "Pasar la salida por una compuerta en app/rules antes de escribir en la base; lo que no resuelva va a run.review(tipo, …).", en: "Pass the output through a gate in app/rules before writing to the database; what it cannot resolve goes to run.review(type, …)."}
+      - {es: "Registrar etapa, agente, pasos y tipos de cola en app/agents/registry.yaml y el propósito en docs/panel/anotaciones.yaml; build-panel --check falla si falta.", en: "Register stage, agent, steps and queue types in app/agents/registry.yaml and the purpose in docs/panel/anotaciones.yaml; build-panel --check fails otherwise."}
+      - {es: "Probar con un agente falso (ver test_extract_end_to_end_with_fake_agents).", en: "Test with a fake agent (see test_extract_end_to_end_with_fake_agents)."}
+    refs: [app/agents/base.py::agent_run, tests/test_extract.py::test_extract_end_to_end_with_fake_agents]
+  - titulo: {es: "Añadir un país", en: "Add a country"}
+    pasos:
+      - {es: "Crear app/seed/<pais>.py y feeds_<pais>.json siguiendo brasil.py: ejes como hipótesis versionadas, medios sin posición, términos cargados, data_gaps declarados.", en: "Create app/seed/<country>.py and feeds_<country>.json following brasil.py: axes as versioned hypotheses, outlets without position, loaded terms, declared data_gaps."}
+      - {es: "Definir COUNTRY en Render y en los workflows. El núcleo (reglas, verificador, núcleo visual) no se toca.", en: "Set COUNTRY in Render and the workflows. The core (rules, verifier, visual core) is not touched."}
+      - {es: "Ojo: varias partes asumen Brasil (zona horaria BRT, 'BR' en el chat, feeds_br.json fijo, prompts en portugués). Ver Discrepancias.", en: "Note: several parts assume Brazil (BRT time zone, 'BR' in the chat, fixed feeds_br.json, Portuguese prompts). See Discrepancies."}
+    refs: [app/seed/brasil.py, app/agents/collect.py::FEEDS_FILE]
+  - titulo: {es: "Cambiar de proveedor de modelo", en: "Change the model provider"}
+    pasos:
+      - {es: "Chat: CHAT_PROVIDER=anthropic con ANTHROPIC_API_KEY y CHAT_MODEL, o openai_compatible con CHAT_BASE_URL y CHAT_API_KEY.", en: "Chat: CHAT_PROVIDER=anthropic with ANTHROPIC_API_KEY and CHAT_MODEL, or openai_compatible with CHAT_BASE_URL and CHAT_API_KEY."}
+      - {es: "Agentes: AGENT_PROVIDER/AGENT_MODEL/AGENT_API_KEY; verificador: VERIFIER_*. Poner el verificador en otro proveedor resuelve D36.", en: "Agents: AGENT_PROVIDER/AGENT_MODEL/AGENT_API_KEY; checker: VERIFIER_*. Putting the checker on another provider resolves D36."}
+      - {es: "Ajustar AGENT_PRICE_* y CHAT_PRICE_* para que el tope y el costo sean fieles; correr eval-chat antes de publicar.", en: "Adjust AGENT_PRICE_* and CHAT_PRICE_* so the cap and cost are accurate; run eval-chat before publishing."}
+    refs: [app/llm.py::complete, app/config.py::Settings, evals/run_eval.py]
+
+hallazgos:
+  - gravedad: alta
+    titulo: {es: "Sin posiciones de medios no hay polos: todo es atribuido y no hay puntos ciegos reales", en: "Without outlet positions there are no poles: everything is attributed and there are no real blind spots"}
+    detalle: {es: "El paso 5 falta. Ningún medio tiene polo, así que la regla de selección nunca da un hecho llano, los títulos van atribuidos (D46) y la cobertura por polo no levanta banderas en ediciones reales. Es la pieza que más cambia lo que el lector ve.", en: "Step 5 is missing. No outlet has a pole, so the selection rule never yields a plain fact, titles are attributed (D46) and per-pole coverage raises no flags in real editions. It is the piece that most changes what the reader sees."}
+    refs: [docs/agentes.md, app/analytics/core.py::pole_members]
+  - gravedad: alta
+    titulo: {es: "El verificador de fidelidad se equivoca en una dirección", en: "The faithfulness checker errs in one direction"}
+    detalle: {es: "Objetó desde memoria vieja una oración correcta sobre una candidatura, dos veces y contra un mismo lado (D47). La regla literal lo contiene, pero un revisor con error sistemático es una fuente de sesgo. El diseño de reemplazo está en docs/revisor-local.md, sin implementar.", en: "It objected from stale memory to a correct sentence about a candidacy, twice and against the same side (D47). The literal rule contains it, but a reviewer with systematic error is a source of bias. The replacement design is in docs/revisor-local.md, not implemented."}
+    refs: [app/agents/draft.py::literal_to_claims, docs/revisor-local.md]
+  - gravedad: media
+    titulo: {es: "El nivel de autonomía no cambia nada", en: "The autonomy level changes nothing"}
+    detalle: {es: "Se guarda y se publica, pero ningún código publica sin el editor en los niveles 2 o 3. Es correcto mientras dure el nivel 1; hay que implementarlo antes de subir.", en: "It is stored and published, but no code publishes without the editor at levels 2 or 3. Fine while at level 1; it must be built before raising it."}
+    refs: [app/admin.py::set_autonomy, app/agents/base.py::agent_run]
+  - gravedad: media
+    titulo: {es: "Reglas académicas y de tema sin conectar", en: "Academic and theme rules not wired"}
+    detalle: {es: "verify_commentary y verify_theme_colors existen y se prueban, pero ningún flujo los llama; las restricciones de base sí actúan.", en: "verify_commentary and verify_theme_colors exist and are tested, but no flow calls them; the database constraints do apply."}
+    refs: [app/rules/commentary.py::verify_commentary, app/rules/visual.py::verify_theme_colors]
+  - gravedad: media
+    titulo: {es: "Suposiciones de Brasil en código general", en: "Brazil assumptions in general code"}
+    detalle: {es: "El chat carga términos con el país 'BR' fijo; la zona horaria BRT está fija en el pipeline y la agrupación; el recolector lee feeds_br.json; los prompts de agentes nombran Brasil.", en: "The chat loads terms with country 'BR' hard-coded; the BRT time zone is fixed in the pipeline and grouping; the collector reads feeds_br.json; agent prompts name Brazil."}
+    refs: [app/chat/service.py::answer, app/pipeline/weekly.py::BRT, app/agents/collect.py::FEEDS_FILE, app/agents/cluster.py::SYSTEM]
+  - gravedad: baja
+    titulo: {es: "framing_annotation nunca se escribe", en: "framing_annotation is never written"}
+    detalle: {es: "El encuadre usa framing_summary. La tabla del encargo (términos cargados por artículo, marco, carga emocional) queda vacía.", en: "Framing uses framing_summary. The brief's table (loaded terms per article, frame, emotional charge) stays empty."}
+    refs: [app/models.py::FramingAnnotation, app/analytics/core.py::compute_framing]
+  - gravedad: baja
+    titulo: {es: "collect.yml vuelve a sembrar en cada corrida", en: "collect.yml reseeds on every run"}
+    detalle: {es: "Cada recolección corre alembic upgrade y seed-brasil. Funciona porque son idempotentes, pero cualquier cambio de semilla se aplica en producción en las dos horas siguientes al merge.", en: "Each collection runs alembic upgrade and seed-brasil. It works because both are idempotent, but any seed change reaches production within two hours of a merge."}
+    refs: [.github/workflows/collect.yml]
+
+glosario:
+  - termino: claim (afirmación)
+    def: {es: "Afirmación atómica verificable de un evento, con tipo (quién, qué, cuándo, dónde, cifra, cita) y apoyos por artículo.", en: "Atomic verifiable statement about an event, with a type (who, what, when, where, figure, quote) and per-article supports."}
+    ref: app/models.py::Claim
+  - termino: claim_support
+    def: {es: "Vínculo entre una afirmación y un artículo: fragmento literal y postura (afirma, contradice, matiza).", en: "Link between a claim and an article: verbatim fragment and stance (affirms, contradicts, qualifies)."}
+    ref: app/models.py::ClaimSupport
+  - termino: eje (cleavage)
+    def: {es: "Fractura política del país, con dos o más polos; versionado con vigencia. Brasil tiene uno principal y otros secundarios.", en: "A country's political cleavage, with two or more poles; versioned with validity dates. Brazil has a principal one and secondary ones."}
+    ref: app/models.py::Cleavage
+  - termino: polo
+    def: {es: "Lado de un eje. Un medio pertenece a un polo solo si su intervalo de posición queda entero de ese lado (D6).", en: "Side of an axis. An outlet belongs to a pole only if its whole position interval lies on that side (D6)."}
+    ref: app/analytics/core.py::pole_members
+  - termino: punto ciego
+    def: {es: "Diferencia grande de cobertura entre polos en un evento de alto impacto. Se observa; no se atribuye intención.", en: "Large coverage gap between poles in a high-impact event. Observed; no intent attributed."}
+    ref: app/models.py::BlindspotFlag
+  - termino: crónica (neutral_brief)
+    def: {es: "Texto factual del evento, compuesto de oraciones con claim_ids; versionado.", en: "Factual text of the event, made of sentences with claim_ids; versioned."}
+    ref: app/models.py::NeutralBrief
+  - termino: hecho llano / atribuido
+    def: {es: "Resultado de la regla de selección: llano se escribe sin atribución; atribuido exige 'segundo X'.", en: "Outcome of the selection rule: plain is written without attribution; attributed requires 'according to X'."}
+    ref: app/rules/selection.py::decide
+  - termino: compuerta
+    def: {es: "Regla en código que decide qué pasa a la siguiente etapa. Un agente no puede saltarla.", en: "A rule in code that decides what passes to the next stage. An agent cannot skip it."}
+    ref: app/rules/verifier.py
+  - termino: cola de excepciones
+    def: {es: "Lo que una compuerta no resolvió, para el editor (review_item, /admin/fila).", en: "What a gate could not resolve, for the editor (review_item, /admin/fila)."}
+    ref: app/models.py::ReviewItem
+  - termino: corrida y paso
+    def: {es: "agent_run es una ejecución de una etapa; agent_step, cada llamada o subtarea, con procedencia y costo.", en: "agent_run is one execution of a stage; agent_step, each call or subtask, with provenance and cost."}
+    ref: app/models.py::AgentRun
+  - termino: nivel de autonomía
+    def: {es: "0 a 3: cuánto publica el sistema sin el editor. Vigente: country.autonomy_level.", en: "0 to 3: how much the system publishes without the editor. Current: country.autonomy_level."}
+    ref: app/models.py::Country
+  - termino: edición
+    def: {es: "Publicación semanal con número, ventana, fecha de corte, estado y 6–12 eventos.", en: "Weekly publication with number, window, cutoff date, state and 6–12 events."}
+    ref: app/models.py::Edition
+  - termino: fecha de corte
+    def: {es: "Viernes 23:59 BRT: lo publicado después no entra en la edición.", en: "Friday 23:59 BRT: anything published later is not in the edition."}
+    ref: app/pipeline/weekly.py::week_window
+  - termino: Modo Factual Puro
+    def: {es: "Vista y modo de chat que muestran solo la crónica y la cobertura, sin capa académica.", en: "View and chat mode showing only the chronicle and coverage, without the academic layer."}
+    ref: app/chat/verify.py::verify_answer
+  - termino: término cargado
+    def: {es: "Palabra que toma partido ('invasão', 'golpe'…); solo aparece atribuida o citada. Lista en la base, editable.", en: "A word that takes sides ('invasão', 'golpe'…); appears only attributed or quoted. Database list, editable."}
+    ref: app/models.py::LoadedTerm
+  - termino: EII
+    def: {es: "Ecosistema de Información Imparcial: el nombre interno de Aletheia News en los documentos de diseño.", en: "Impartial Information Ecosystem: Aletheia News's internal name in the design documents."}
+    ref: docs/agentes.md
+
+# Nombres visibles de etapas, agentes y compuertas (los ids viven en app/agents/registry.yaml).
+nombres:
+  recoleccion: {es: "Recolección", en: "Collection"}
+  embeddings_entidades: {es: "Embeddings y entidades", en: "Embeddings and entities"}
+  agrupacion: {es: "Agrupación en eventos", en: "Event grouping"}
+  revision_eventos: {es: "Revisión de eventos", en: "Event review"}
+  seleccion_eventos_edicion: {es: "Armado de la edición", en: "Edition assembly"}
+  extraccion_afirmaciones: {es: "Afirmaciones", en: "Claims"}
+  posicion_medios: {es: "Posición de medios", en: "Outlet positions"}
+  seleccion: {es: "Regla de selección", en: "Selection rule"}
+  cobertura: {es: "Cobertura y punto ciego", en: "Coverage and blind spots"}
+  encuadre: {es: "Encuadre", en: "Framing"}
+  redaccion: {es: "Redacción restringida", en: "Constrained drafting"}
+  verificacion_cronica: {es: "Verificador de la crónica", en: "Chronicle verifier"}
+  revision_adversarial: {es: "Revisor local", en: "Local reviewer"}
+  piezas_visuales: {es: "Piezas visuales", en: "Visuals"}
+  traduccion: {es: "Traducción", en: "Translation"}
+  capa_academica: {es: "Capa académica", en: "Academic layer"}
+  aprobacion: {es: "Aprobación del editor", en: "Editor approval"}
+  sitio: {es: "Sitio estático", en: "Static site"}
+  transparencia: {es: "Cómo se hizo la edición", en: "How the edition was made"}
+  chat: {es: "Chat", en: "Chat"}
+  arranque_pais: {es: "Arranque de país", en: "Country bootstrap"}
+  agente_evento: {es: "Agente de eventos", en: "Event agent"}
+  extractor: {es: "Extractor de afirmaciones", en: "Claim extractor"}
+  verificador_afirmaciones: {es: "Verificador de afirmaciones", en: "Claim checker"}
+  redactor: {es: "Redactor", en: "Drafter"}
+  anotador_posicion: {es: "Anotadores de posición", en: "Position annotators"}
+  revisor_adversarial: {es: "Revisor local multidisciplinar", en: "Local multidisciplinary reviewer"}
+  verificador_fidelidad: {es: "Verificador de fidelidad", en: "Faithfulness checker"}
+  traductor: {es: "Traductor", en: "Translator"}
+  regla_literal: {es: "Regla literal (D47)", en: "Literal rule (D47)"}
+  agente_literatura: {es: "Agente de literatura", en: "Literature agent"}
+  agente_arranque_pais: {es: "Agente de arranque de país", en: "Country bootstrap agent"}
+  robots_ritmo: {es: "robots.txt y ritmo", en: "robots.txt and rate"}
+  solo_titular_resumen: {es: "Solo titular y resumen", en: "Headline and summary only"}
+  prefiltro_alcance_opinion: {es: "Prefiltro de alcance y opinión", en: "Scope and opinion prefilter"}
+  titulo_sin_terminos: {es: "Título sin términos cargados", en: "Title without loaded terms"}
+  compuertas_afirmaciones: {es: "Compuertas de afirmaciones", en: "Claim gates"}
+  fusion_verificador: {es: "Fusión con el verificador", en: "Merge with the checker"}
+  regla_seleccion: {es: "Regla de selección", en: "Selection rule"}
+  cifras_en_disputa: {es: "Cifras en disputa", en: "Disputed figures"}
+  verificador_oraciones: {es: "Verificador de oraciones", en: "Sentence verifier"}
+  terminos_cargados: {es: "Términos cargados", en: "Loaded terms"}
+  regla_literal: {regla: {es: "Una objeción del verificador de fidelidad se anula si todas las palabras de contenido de la oración vienen de sus afirmaciones (y en el mismo orden si cita una sola); nunca anula negaciones, inversión de roles ni actores añadidos.", en: "A faithfulness objection is overridden if every content word of the sentence comes from its claims (in the same order if it cites one); it never overrides negation, role reversal or added actors."}, al_fallar: {es: "La anulación queda en la cola (veredito_anulado) para el editor.", en: "The override is queued (veredito_anulado) for the editor."}}
+  umbral_punto_ciego: {es: "Umbral de punto ciego", en: "Blind-spot threshold"}
+  alerta_ingesta: {es: "Alerta de ingesta por polo", en: "Per-pole ingestion alert"}
+  verificador_visual: {es: "Verificador visual", en: "Visual verifier"}
+  reglas_academicas: {es: "Reglas académicas", en: "Academic rules"}
+  filtro_tematico: {es: "Filtro temático", en: "Thematic filter"}
+  compuertas_edicion: {es: "Compuertas de la edición", en: "Edition gates"}
+  verificador_chat: {es: "Verificador del chat", en: "Chat verifier"}
+  presupuesto_chat: {es: "Presupuesto y límite del chat", en: "Chat budget and rate limit"}
+  tope_gasto: {es: "Tope de gasto por corrida", en: "Per-run spending cap"}
+  peso_pagina: {es: "Peso de página", en: "Page weight"}

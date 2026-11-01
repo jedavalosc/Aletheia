@@ -165,6 +165,10 @@ En el panel: **Fila de exceções** (lo que las reglas no resuelven), **Eventos 
 
 **Secretos de GitHub necesarios** (Settings → Secrets and variables → Actions): `DATABASE_URL` (cadena de Neon) y `CHAT_API_KEY` (clave de Kimi; los agentes usan el mismo proveedor que el chat).
 
+## Panel didáctico (traspaso)
+
+`/admin/painel` explica cómo funciona todo el sistema, con enlaces al código: etapas, agentes, compuertas, cola de excepciones, modelo de datos, infraestructura, operación semanal y deuda conocida. Se genera del repositorio y de `app/agents/registry.yaml` y `docs/panel/anotaciones.yaml`; en local, `python -m app.cli build-panel --sem-dados` escribe `build/panel/index.html`. `--check` falla si el registro y el código divergen. Ver `CONTRIBUTING.md` y D52–D54.
+
 ## Siguientes pasos
 
 1. Paso 5: posición de medios por dos agentes anotadores, con muestra de control del editor.

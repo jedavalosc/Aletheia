@@ -1,0 +1,449 @@
+# Registro central de etapas, agentes y compuertas de Aletheia News.
+#
+# Lo lee el panel didáctico (app/panel, ruta /admin/painel). `python -m app.cli build-panel --check`
+# falla si:
+#   * el código abre un agent_run, registra un paso (run.step), envía un tipo a la cola (run.review)
+#     o define una versión de prompt que no figura aquí;
+#   * una referencia de este archivo apunta a un archivo, función, clase o constante inexistente.
+# Las referencias tienen la forma  ruta/al/archivo.py::Simbolo  (o solo la ruta).
+# Lo que el código no puede decir (propósito, fallos conocidos, procedimientos) va en
+# docs/panel/anotaciones.yaml, no aquí.
+#
+# estado: implementado | parcial | especificado_no_implementado
+# ejecutor: agente (llama a un modelo) | determinista (solo código) | humano (editor en /admin)
+
+version: 1
+actualizado: "2026-10-14"  # al commit 3aa398e (paso 4)
+repositorio: https://github.com/jedavalosc/aletheia
+
+etapas:
+  - id: recoleccion
+    paso_agentico: 1
+    estado: implementado
+    ejecutor: determinista
+    run_tipo: recoleccion
+    pasos_registrados: [sincronizar_fuentes, normalizar_urls, recolector, vigilancia_ingesta]
+    codigo: [app/agents/collect.py::collect, app/agents/collect.py::Fetcher, app/agents/collect.py::canonical_url]
+    cli: python -m app.cli collect
+    programacion: [.github/workflows/collect.yml, app/pipeline/weekly.py::ingest]
+    compuertas: [robots_ritmo, solo_titular_resumen]
+    cola: [fuente_fallando, fuente_sin_novedades]
+    pruebas:
+      - tests/test_agents.py::test_canonical_url_strips_tracking_and_unwraps_redirects
+      - tests/test_agents.py::test_parse_rss_and_sitemap_keep_only_headline_and_summary
+      - tests/test_agents.py::test_collect_and_cluster_end_to_end_without_network
+    spec: ["encargo §6 (ingesta, derechos de autor)", "encargo §14", docs/agentes.md]
+    sigue_a: []
+    pos: [0, 0]
+
+  - id: embeddings_entidades
+    estado: especificado_no_implementado
+    ejecutor: determinista
+    sustituido_por: agrupacion
+    spec: ["encargo §6 (embeddings y entidades)", "encargo §10 (pgvector)", docs/decisiones.md]
+    sigue_a: [recoleccion]
+    pos: [0, 2]
+
+  - id: agrupacion
+    paso_agentico: 2
+    estado: implementado
+    ejecutor: agente
+    run_tipo: agrupacion
+    pasos_registrados: [seleccion_articulos, limpieza_candidatos, absorcion, agrupamiento_similitud, agente_evento]
+    agentes: [agente_evento]
+    codigo: [app/agents/cluster.py::cluster_week, app/agents/cluster.py::absorb_into_existing, app/agents/cluster.py::tfidf, app/agents/cluster.py::average_linkage]
+    cli: python -m app.cli cluster
+    programacion: [app/pipeline/weekly.py::group]
+    compuertas: [prefiltro_alcance_opinion, titulo_sin_terminos, tope_gasto]
+    cola: [agrupacion_dudosa, titulo_cargado, alcance_excepcional, agente_sin_respuesta]
+    pruebas:
+      - tests/test_agents.py::test_scope_and_opinion_prefilter
+      - tests/test_agents.py::test_clustering_separates_events_sharing_a_name
+      - tests/test_agents.py::test_collect_and_cluster_end_to_end_without_network
+      - tests/test_draft.py::test_rerun_later_in_week_keeps_worked_events_and_refreshes_them
+    spec: ["encargo §3 (ventana de 7 días)", "encargo §4 (alcance)", "encargo §6", docs/agentes.md]
+    sigue_a: [recoleccion]
+    pos: [1, 0]
+
+  - id: revision_eventos
+    estado: implementado
+    ejecutor: humano
+    codigo: [app/admin.py::week_events, app/admin.py::edit_event]
+    pantalla: /admin/eventos
+    compuertas: [titulo_sin_terminos]
+    pruebas: []
+    spec: ["encargo §6 (fusión y división manual)"]
+    sigue_a: [agrupacion]
+    pos: [2, 2]
+
+  - id: seleccion_eventos_edicion
+    estado: implementado
+    ejecutor: determinista
+    codigo: [app/agents/draft.py::assemble_edition, app/agents/draft.py::week_events, app/pipeline/weekly.py::ensure_edition]
+    programacion: [app/agents/draft.py::draft_edition]
+    compuertas: [compuertas_edicion]
+    cola: [edicao_curta]
+    pruebas: [tests/test_draft.py::test_draft_end_to_end_with_fake_agents]
+    spec: ["encargo §3 (6 a 12 eventos por edición)", docs/decisiones.md]
+    sigue_a: [extraccion_afirmaciones, revision_eventos]
+    pos: [3, 2]
+
+  - id: extraccion_afirmaciones
+    paso_agentico: 3
+    estado: implementado
+    ejecutor: agente
+    run_tipo: afirmaciones
+    pasos_registrados: [extractor, verificador, regla_seleccion]
+    agentes: [extractor, verificador_afirmaciones]
+    codigo: [app/agents/extract.py::extract_week, app/agents/extract.py::pick_articles, app/agents/extract.py::merge]
+    cli: python -m app.cli extract
+    programacion: [app/pipeline/weekly.py::extract]
+    compuertas: [compuertas_afirmaciones, fusion_verificador, regla_seleccion, tope_gasto]
+    cola: [afirmacion_en_revision, verificacao_ausente]
+    pruebas:
+      - tests/test_extract.py::test_gate_drops_invented_supports_and_numbers_and_loaded_terms
+      - tests/test_extract.py::test_merge_requires_checker_confirmation
+      - tests/test_extract.py::test_extract_end_to_end_with_fake_agents
+    spec: ["encargo §6 (afirmaciones atómicas, alineación)", "encargo §14", docs/agentes.md]
+    sigue_a: [agrupacion]
+    pos: [2, 0]
+
+  - id: posicion_medios
+    paso_agentico: 5
+    estado: especificado_no_implementado
+    ejecutor: agente
+    agentes: [anotador_posicion]
+    spec: ["encargo §2 principio 3", "encargo §14 (dos anotadores)", docs/agentes.md]
+    sigue_a: [recoleccion]
+    pos: [1, 1]
+
+  - id: seleccion
+    estado: implementado
+    ejecutor: determinista
+    codigo: [app/analytics/core.py::apply_selection, app/rules/selection.py::decide]
+    programacion: [app/agents/extract.py::extract_week, app/analytics/core.py::run_event]
+    compuertas: [regla_seleccion, cifras_en_disputa]
+    pruebas: [tests/test_rules.py::test_selection_rule, tests/test_demo_e2e.py::test_selection_and_flags_are_computed_and_symmetric]
+    spec: ["encargo §6 (reglas de la crónica)"]
+    sigue_a: [extraccion_afirmaciones, posicion_medios]
+    pos: [3, 0]
+
+  - id: cobertura
+    estado: implementado
+    ejecutor: determinista
+    codigo: [app/analytics/core.py::compute_coverage, app/analytics/core.py::pole_members, app/analytics/core.py::active_outlets]
+    programacion: [app/analytics/core.py::run_event, app/pipeline/weekly.py::run]
+    compuertas: [umbral_punto_ciego, alerta_ingesta]
+    pruebas: [tests/test_demo_e2e.py::test_selection_and_flags_are_computed_and_symmetric]
+    spec: ["encargo §2 principio 2", "encargo §3 (snapshot de cierre)"]
+    sigue_a: [seleccion]
+    pos: [4, 0]
+
+  - id: encuadre
+    estado: parcial
+    ejecutor: determinista
+    codigo: [app/analytics/core.py::compute_framing]
+    programacion: [app/analytics/core.py::run_event]
+    compuertas: []
+    pruebas: []
+    spec: ["encargo §6 (encuadre)", "encargo §8 (vista tríptica)"]
+    sigue_a: [seleccion]
+    pos: [4, 1]
+
+  - id: redaccion
+    paso_agentico: 4
+    estado: implementado
+    ejecutor: agente
+    run_tipo: redaccion
+    pasos_registrados: [edicion, redactor, fidelidad, verificador_codigo, traductor]
+    agentes: [redactor, verificador_fidelidad, traductor]
+    codigo: [app/agents/draft.py::draft_edition, app/agents/draft.py::draft_event, app/agents/draft.py::code_issues, app/agents/draft.py::faithful_issues]
+    cli: python -m app.cli draft
+    programacion: [app/pipeline/weekly.py::draft, app/admin.py::redraft]
+    compuertas: [verificador_oraciones, regla_literal, tope_gasto]
+    cola: [cronica_sem_afirmacoes, cobertura_incompleta, cronica_rejeitada, fidelidade_ausente, oracoes_descartadas, veredito_anulado]
+    pruebas:
+      - tests/test_draft.py::test_code_issues_catch_numbers_attribution_unaccepted_and_title_form
+      - tests/test_draft.py::test_last_checker_verdict_wins
+      - tests/test_draft.py::test_failing_title_rejects_and_queues
+      - tests/test_draft.py::test_draft_end_to_end_with_fake_agents
+    spec: ["encargo §6 (redacción restringida)", "encargo §7", docs/estilo-redacao.md, docs/agentes.md]
+    sigue_a: [seleccion, seleccion_eventos_edicion]
+    pos: [4, 2]
+
+  - id: verificacion_cronica
+    estado: implementado
+    ejecutor: determinista
+    codigo: [app/editorial.py::verify_brief_all_languages, app/rules/verifier.py::verify_brief, app/agents/draft.py::code_issues]
+    programacion: [app/agents/draft.py::draft_event, app/pipeline/weekly.py::run, app/admin.py::reverify]
+    compuertas: [verificador_oraciones, terminos_cargados, cifras_en_disputa]
+    pruebas:
+      - tests/test_rules.py::test_sentence_without_claim_rejected
+      - tests/test_demo_e2e.py::test_every_sentence_has_valid_claims_in_all_languages
+    spec: ["encargo §6", "encargo §12"]
+    sigue_a: [redaccion]
+    pos: [5, 2]
+
+  - id: revision_adversarial
+    estado: especificado_no_implementado
+    ejecutor: agente
+    agentes: [revisor_adversarial]
+    spec: ["encargo §14 (revisor adversarial en otro proveedor)", docs/revisor-local.md, docs/agentes.md]
+    sigue_a: [verificacion_cronica]
+    pos: [6, 2]
+
+  - id: piezas_visuales
+    estado: implementado
+    ejecutor: determinista
+    codigo: [app/analytics/visuals.py::build_standard_visuals, app/analytics/visuals.py::verify_and_set]
+    programacion: [app/pipeline/weekly.py::run]
+    compuertas: [verificador_visual]
+    pruebas: [tests/test_demo_e2e.py::test_visuals_verified_with_embedded_source_cutoff_denominator, tests/test_rules.py::test_palette_rules]
+    spec: ["encargo §8 (infografías estándar)", "EII — Diseño e Infografía"]
+    sigue_a: [cobertura]
+    pos: [5, 0]
+
+  - id: traduccion
+    estado: implementado
+    ejecutor: agente
+    run_tipo: traduccion
+    pasos_registrados: [traductor]
+    agentes: [traductor]
+    codigo: [app/agents/draft.py::translate_brief, app/agents/draft.py::retranslate_sentence, app/editorial.py::mark_translation_reviewed, app/admin.py::translation_reviewed]
+    programacion: [app/agents/draft.py::draft_event, app/admin.py::edit_sentence]
+    compuertas: [verificador_oraciones]
+    pruebas: [tests/test_draft.py::test_draft_end_to_end_with_fake_agents, tests/test_demo_e2e.py::test_every_sentence_has_valid_claims_in_all_languages]
+    spec: ["encargo §6 (capa de traducción)", "encargo §12 (tres lenguas)", docs/decisiones.md]
+    sigue_a: [verificacion_cronica]
+    pos: [6, 1]
+
+  - id: capa_academica
+    estado: parcial
+    ejecutor: humano
+    agentes: [agente_literatura]
+    codigo: [app/rules/commentary.py::verify_commentary, app/models.py::CommentaryStatement]
+    compuertas: [reglas_academicas]
+    pruebas: [tests/test_rules.py::test_commentary_structure_rules]
+    spec: ["encargo §2 principio 4", "encargo §14 (comentador no se sustituye)", "EII — Comentador Académico"]
+    sigue_a: [seleccion]
+    pos: [4, 3]
+
+  - id: aprobacion
+    estado: implementado
+    ejecutor: humano
+    codigo: [app/editorial.py::edition_gates, app/editorial.py::approve_edition, app/admin.py::approve_edition_route]
+    pantalla: /admin, /admin/fila, /admin/edicao/{id}
+    compuertas: [compuertas_edicion, filtro_tematico]
+    pruebas: [tests/test_demo_e2e.py::test_gates_block_until_human_approval]
+    spec: ["encargo §3", "encargo §14 (niveles de autonomía)"]
+    sigue_a: [piezas_visuales, traduccion, revision_adversarial]
+    pos: [7, 0]
+
+  - id: sitio
+    estado: implementado
+    ejecutor: determinista
+    codigo: [app/site/build.py::build_site]
+    cli: python -m app.cli build-site
+    programacion: [app/main.py::rebuild_site, app/main.py::_site_sync, app/admin.py::approve_edition_route]
+    compuertas: [peso_pagina]
+    pruebas: [tests/test_demo_e2e.py::test_site_is_trilingual_light_and_marked]
+    spec: ["encargo §8", "encargo §12"]
+    sigue_a: [aprobacion]
+    pos: [8, 0]
+
+  - id: transparencia
+    estado: especificado_no_implementado
+    ejecutor: determinista
+    spec: ["encargo §14 (página 'Como esta edição foi feita')", docs/agentes.md]
+    sigue_a: [aprobacion]
+    pos: [8, 1]
+
+  - id: chat
+    estado: implementado
+    ejecutor: agente
+    agentes: [chat]
+    codigo: [app/chat/service.py::handle, app/chat/service.py::answer, app/chat/service.py::retrieve, app/chat/corpus.py::build_corpus]
+    pantalla: POST /api/chat
+    compuertas: [verificador_chat, presupuesto_chat]
+    pruebas:
+      - tests/test_demo_e2e.py::test_chat_offline_answers_are_verified
+      - tests/test_demo_e2e.py::test_chat_verifier_rejects_bad_answers
+      - evals/run_eval.py
+    spec: ["encargo §9"]
+    sigue_a: [sitio]
+    pos: [9, 0]
+
+  - id: arranque_pais
+    estado: especificado_no_implementado
+    ejecutor: agente
+    agentes: [agente_arranque_pais]
+    spec: ["encargo §14 (proceso general)", docs/agentes.md]
+    sigue_a: []
+    pos: [0, 3]
+
+agentes:
+  - id: agente_evento
+    etapa: agrupacion
+    estado: implementado
+    paso_registrado: agente_evento
+    rol_modelo: agent
+    prompt: app/agents/cluster.py::SYSTEM
+    prompt_version: app/agents/cluster.py::PROMPT_VERSION
+    llamada: app/agents/cluster.py::adjudicate
+    compuertas: [titulo_sin_terminos, tope_gasto]
+    cola: [agrupacion_dudosa, titulo_cargado, alcance_excepcional, agente_sin_respuesta]
+
+  - id: extractor
+    etapa: extraccion_afirmaciones
+    estado: implementado
+    paso_registrado: extractor
+    rol_modelo: agent
+    prompt: app/agents/extract.py::EXTRACT_SYSTEM
+    prompt_version: app/agents/extract.py::EXTRACT_VERSION
+    llamada: app/agents/extract.py::extract_week
+    compuertas: [compuertas_afirmaciones, tope_gasto]
+    cola: []
+
+  - id: verificador_afirmaciones
+    etapa: extraccion_afirmaciones
+    estado: implementado
+    paso_registrado: verificador
+    rol_modelo: verifier
+    prompt: app/agents/extract.py::VERIFY_SYSTEM
+    prompt_version: app/agents/extract.py::VERIFY_VERSION
+    llamada: app/agents/extract.py::extract_week
+    verifica_a: extractor
+    compuertas: [fusion_verificador, tope_gasto]
+    cola: [afirmacion_en_revision, verificacao_ausente]
+
+  - id: chat
+    etapa: chat
+    estado: implementado
+    rol_modelo: chat
+    prompt: app/chat/prompt.py::SYSTEM
+    prompt_version: app/chat/prompt.py::PROMPT_VERSION
+    llamada: app/chat/service.py::call_model
+    compuertas: [verificador_chat, presupuesto_chat]
+    cola: []
+
+  - id: redactor
+    etapa: redaccion
+    estado: implementado
+    paso_registrado: redactor
+    rol_modelo: agent
+    prompt: app/agents/draft.py::DRAFT_SYSTEM
+    prompt_version: app/agents/draft.py::DRAFT_VERSION
+    llamada: app/agents/draft.py::draft_event
+    compuertas: [verificador_oraciones, tope_gasto]
+    cola: [cronica_sem_afirmacoes, cobertura_incompleta, cronica_rejeitada, oracoes_descartadas]
+
+  - id: verificador_fidelidad
+    etapa: redaccion
+    estado: implementado
+    paso_registrado: fidelidad
+    rol_modelo: verifier
+    prompt: app/agents/draft.py::FAITHFUL_SYSTEM
+    prompt_version: app/agents/draft.py::FAITHFUL_VERSION
+    llamada: app/agents/draft.py::draft_event
+    verifica_a: redactor
+    compuertas: [regla_literal, tope_gasto]
+    cola: [fidelidade_ausente, veredito_anulado]
+
+  - id: traductor
+    etapa: traduccion
+    estado: implementado
+    paso_registrado: traductor
+    rol_modelo: agent
+    prompt: app/agents/draft.py::TRANSLATE_SYSTEM
+    prompt_version: app/agents/draft.py::TRANSLATE_VERSION
+    llamada: app/agents/draft.py::translate_brief
+    compuertas: [verificador_oraciones, tope_gasto]
+    cola: []
+
+  - id: anotador_posicion
+    etapa: posicion_medios
+    estado: especificado_no_implementado
+    spec: ["encargo §14 (dos anotadores + acuerdo)", docs/agentes.md]
+
+  - id: revisor_adversarial
+    etapa: revision_adversarial
+    estado: especificado_no_implementado
+    spec: ["encargo §14", docs/revisor-local.md]
+
+  - id: agente_literatura
+    etapa: capa_academica
+    estado: especificado_no_implementado
+    spec: ["encargo §14 (comentador académico no se sustituye)", docs/agentes.md]
+
+  - id: agente_arranque_pais
+    etapa: arranque_pais
+    estado: especificado_no_implementado
+    spec: ["encargo §14 (proceso general)", docs/agentes.md]
+
+compuertas:
+  - id: robots_ritmo
+    codigo: [app/agents/collect.py::Fetcher]
+    pruebas: []
+  - id: solo_titular_resumen
+    codigo: [app/agents/collect.py::parse_rss, app/agents/collect.py::parse_news_sitemap, app/agents/collect.py::clean_text]
+    pruebas: [tests/test_agents.py::test_parse_rss_and_sitemap_keep_only_headline_and_summary]
+  - id: prefiltro_alcance_opinion
+    codigo: [app/agents/cluster.py::in_scope_prefilter, app/agents/cluster.py::is_opinion]
+    pruebas: [tests/test_agents.py::test_scope_and_opinion_prefilter]
+  - id: titulo_sin_terminos
+    codigo: [app/agents/cluster.py::cluster_week, app/admin.py::edit_event, app/rules/loaded_terms.py::violations]
+    pruebas: []
+  - id: compuertas_afirmaciones
+    codigo: [app/agents/extract.py::gate, app/rules/claims.py::fragment_in_source, app/rules/claims.py::unsupported_numbers, app/rules/claims.py::claim_problems]
+    pruebas:
+      - tests/test_extract.py::test_fragment_must_be_verbatim
+      - tests/test_extract.py::test_numbers_must_come_from_fragments
+      - tests/test_extract.py::test_gate_drops_invented_supports_and_numbers_and_loaded_terms
+  - id: fusion_verificador
+    codigo: [app/agents/extract.py::merge]
+    pruebas: [tests/test_extract.py::test_merge_requires_checker_confirmation, tests/test_extract.py::test_merge_softens_affirms_vs_qualifies_but_flags_contradiction]
+  - id: regla_seleccion
+    codigo: [app/rules/selection.py::decide, app/analytics/core.py::apply_selection]
+    pruebas: [tests/test_rules.py::test_selection_rule, tests/test_rules.py::test_single_pole_claim_needs_attribution]
+  - id: cifras_en_disputa
+    codigo: [app/analytics/core.py::apply_selection, app/rules/verifier.py::verify_sentence]
+    pruebas: [tests/test_rules.py::test_disputed_figures_never_collapsed]
+  - id: verificador_oraciones
+    codigo: [app/rules/verifier.py::verify_sentence, app/rules/verifier.py::verify_brief, app/rules/verifier.py::number_supported, app/editorial.py::verify_brief_all_languages, app/agents/draft.py::code_issues]
+    pruebas: [tests/test_rules.py::test_sentence_without_claim_rejected, tests/test_rules.py::test_nonexistent_and_foreign_claims_rejected, tests/test_draft.py::test_code_issues_catch_numbers_attribution_unaccepted_and_title_form, tests/test_draft.py::test_discouraged_verbs_outside_quotes]
+  - id: regla_literal
+    codigo: [app/agents/draft.py::literal_to_claims, app/agents/draft.py::faithful_issues]
+    pruebas: [tests/test_draft.py::test_literal_sentence_overrules_checker_but_not_changes_of_meaning, tests/test_draft.py::test_last_checker_verdict_wins]
+  - id: terminos_cargados
+    codigo: [app/rules/loaded_terms.py::violations, app/rules/loaded_terms.py::scan, app/editorial.py::load_terms]
+    pruebas: [tests/test_rules.py::test_loaded_term_needs_attribution_or_quote, tests/test_rules.py::test_quote_only_terms]
+  - id: umbral_punto_ciego
+    codigo: [app/analytics/core.py::compute_coverage, app/analytics/core.py::BLINDSPOT_GAP_THRESHOLD, app/analytics/core.py::BLINDSPOT_MIN_IMPACT]
+    pruebas: [tests/test_demo_e2e.py::test_selection_and_flags_are_computed_and_symmetric]
+  - id: alerta_ingesta
+    codigo: [app/pipeline/weekly.py::_ingestion_alerts]
+    pruebas: []
+  - id: verificador_visual
+    codigo: [app/rules/visual.py::verify_visual, app/analytics/visuals.py::verify_and_set]
+    pruebas: [tests/test_demo_e2e.py::test_visuals_verified_with_embedded_source_cutoff_denominator, tests/test_rules.py::test_palette_rules]
+  - id: reglas_academicas
+    codigo: [app/rules/commentary.py::verify_commentary, app/models.py::CommentaryStatement, app/models.py::Commentary]
+    pruebas: [tests/test_rules.py::test_commentary_structure_rules]
+  - id: filtro_tematico
+    codigo: [app/models.py::Event, app/editorial.py::edition_gates, app/admin.py::confirm_inclusion]
+    pruebas: [tests/test_demo_e2e.py::test_gates_block_until_human_approval]
+  - id: compuertas_edicion
+    codigo: [app/editorial.py::edition_gates, app/editorial.py::approve_edition]
+    pruebas: [tests/test_demo_e2e.py::test_gates_block_until_human_approval]
+  - id: verificador_chat
+    codigo: [app/chat/verify.py::verify_answer]
+    pruebas: [tests/test_demo_e2e.py::test_chat_verifier_rejects_bad_answers, tests/test_demo_e2e.py::test_chat_offline_answers_are_verified]
+  - id: presupuesto_chat
+    codigo: [app/chat/store.py::budget_left, app/main.py::chat]
+    pruebas: []
+  - id: tope_gasto
+    codigo: [app/agents/base.py::Run, app/agents/base.py::BudgetExceeded, app/agents/base.py::agent_run, app/agents/draft.py::run_budget]
+    pruebas: []
+  - id: peso_pagina
+    codigo: [app/site/build.py::page_weight, app/site/build.py::PAGE_BUDGET]
+    pruebas: [tests/test_demo_e2e.py::test_site_is_trilingual_light_and_marked]
