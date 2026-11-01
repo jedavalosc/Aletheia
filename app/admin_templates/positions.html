@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block main %}
+<h1>Posições dos veículos — {{ axis.nombre }}</h1>
+<p class="muted">Eixo principal. Negativo: {{ poles[0].etiqueta }}; positivo: {{ poles[1].etiqueta }}. Zero é a média dos veículos monitorados no mesmo evento, não um ponto neutro absoluto. Um veículo só entra num polo quando todo o intervalo fica de um lado do zero (D6). Codificação por modelo, provisória até a validação do editor.</p>
+{% if last_run %}<p class="small">Última estimativa: corrida <a href="/admin/corridas/{{ last_run.id }}">#{{ last_run.id }}</a> · {{ last_run.estado }} · alfa entre modelos {{ last_run.resumen.get('alpha_modelos') }} · {{ last_run.resumen.get('articulos') }} textos</p>{% endif %}
+<p class="small">Concordância editor–modelos: {% if agreement %}alfa {{ agreement.alpha }} em {{ agreement.n }} textos{% else %}<b>ainda sem amostra do editor</b>{% endif %} (mínimo 0,667; com 20 ou mais textos abaixo do mínimo, novas estimativas não são publicadas).</p>
+<form class="inline" method="post" action="/admin/posicoes/estimar"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Estimar agora</button></form>
+<h2>Estimativas vigentes</h2>
+<table><thead><tr><th>Veículo</th><th>Escore</th><th>IC 95%</th><th>Polo</th><th>Textos</th><th>Desde</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.o.nombre }}</td><td class="num">{{ '%+.2f'|format(r.p.score) }}</td><td class="num">[{{ '%+.2f'|format(r.p.ic_inferior) }}; {{ '%+.2f'|format(r.p.ic_superior) }}]</td><td>{{ r.side }}</td><td class="num">{{ r.p.n_articulos_base }}</td><td>{{ r.p.vigente_desde }}</td></tr>{% else %}<tr><td colspan="6" class="muted">Nenhuma estimativa vigente.</td></tr>{% endfor %}</tbody></table>
+<h2>Amostra cega do mês</h2>
+<p class="muted">Codifique cada texto como os modelos codificam: −2 claramente favorável a {{ poles[0].etiqueta }} (ou hostil a {{ poles[1].etiqueta }}) … +2 o inverso; 0 neutro; "não se aplica" se o texto não envolve os campos. Julgue a redação e a ênfase, não se o fato é bom ou ruim para um campo. Veículo e códigos dos modelos ficam ocultos.</p>
+{% if sample %}<form method="post" action="/admin/posicoes/codificar"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="axis_id" value="{{ axis.id }}">
+<table><tbody>{% for a in sample %}<tr><td>{{ a.titular }}{% if a.resumen %}<div class="muted small">{{ a.resumen }}</div>{% endif %}</td><td style="white-space:nowrap">
+<select name="v_{{ a.id }}"><option value="">—</option><option value="-2">−2</option><option value="-1">−1</option><option value="0">0</option><option value="1">+1</option><option value="2">+2</option><option value="na">não se aplica</option></select></td></tr>{% endfor %}</tbody></table>
+<button>Salvar códigos</button></form>{% else %}<p class="muted">Nada a codificar: os modelos ainda não codificaram textos, ou você já codificou todos.</p>{% endif %}
+{% endblock %}

@@ -160,6 +160,7 @@ Diseño en [`docs/agentes.md`](docs/agentes.md): los agentes proponen, el códig
 | 2. Agrupación en eventos candidatos | `python -m app.cli cluster [--semana AAAA-MM-DD] [--sem-modelo]` | Sábado 03:00 BRT, dentro del pipeline semanal |
 | 3. Afirmaciones con verificación cruzada | `python -m app.cli extract [--semana AAAA-MM-DD] [--max-eventos 15] [--refazer]` | Sábado, después de la agrupación |
 | 4. Edición y crónicas restringidas (PT, ES, EN) | `python -m app.cli draft [--semana AAAA-MM-DD] [--eventos ID ...] [--refazer] [--instrucao "..."]` | Sábado, después de las afirmaciones |
+| 5. Posición de medios (dos modelos, compuerta de acuerdo) | `python -m app.cli positions [--semana AAAA-MM-DD] [--forcar]` | Sábado, tras la agrupación; se renueva cada 28 días |
 
 En el panel: **Fila de exceções** (lo que las reglas no resuelven), **Eventos da semana** (confirmar, fusionar, retirar artículos, marcar fuera de alcance), **Corridas dos agentes** (cada paso con modelo, versión de prompt, tokens y costo) y, en cada edición, **Redigir nova versão** (con instrucción opcional al redactor) y la edición de una oración, que rehace sus traducciones.
 
@@ -171,6 +172,6 @@ En el panel: **Fila de exceções** (lo que las reglas no resuelven), **Eventos 
 
 ## Siguientes pasos
 
-1. Paso 5: posición de medios por dos agentes anotadores, con muestra de control del editor.
+1. Segundo anotador de posición en otro proveedor y muestra ciega del editor.
 2. Página pública "Como esta edição foi feita".
 3. Calibrar umbrales con cuatro semanas de datos reales.

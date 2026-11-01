@@ -122,9 +122,30 @@ class OutletPosition(Base):
     vigente_desde: Mapped[date] = mapped_column(Date)
     vigente_hasta: Mapped[date | None] = mapped_column(Date, nullable=True)
     creado_en: Mapped[datetime] = _now()
+    # Step 5: annotators, agreement, window, sample sizes, editor validation (D56–D59).
+    detalle: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     __table_args__ = (
         CheckConstraint("score >= -1 AND score <= 1", name="ck_outlet_score_range"),
         CheckConstraint("ic_inferior <= score AND score <= ic_superior", name="ck_outlet_ic"),
+    )
+
+
+class PositionAnnotation(Base):
+    """One coder's reading of one article on one axis: -2..+2 towards the second pole, or NULL when the
+    text does not bear on the axis. Coders: model annotators ('modelo:<id>') and the editor ('editor:<name>')."""
+    __tablename__ = "position_annotation"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(ForeignKey("article.id"))
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("event.id"), nullable=True)
+    cleavage_id: Mapped[int] = mapped_column(ForeignKey("cleavage.id"))
+    codificador: Mapped[str] = mapped_column(String(120))
+    prompt_version: Mapped[str] = mapped_column(String(40))
+    valor: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("agent_run.id"), nullable=True)
+    creado_en: Mapped[datetime] = _now()
+    __table_args__ = (
+        UniqueConstraint("article_id", "cleavage_id", "codificador", "prompt_version"),
+        CheckConstraint("valor IS NULL OR (valor >= -2 AND valor <= 2)", name="ck_pa_valor"),
     )
 
 

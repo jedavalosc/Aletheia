@@ -66,7 +66,7 @@ El alojamiento puede seguir gratuito. El costo nuevo es el modelo, sobre todo la
 | Agrupación en eventos (paso 2) | Hecho: TF-IDF + enlace promedio + revisión por agente (D30, D31) |
 | Extracción y verificación cruzada de afirmaciones (paso 3) | Hecho: `kimi-k3` extrae, compuertas en código, `kimi-k2.6` verifica (D35–D43). Semana del 5/10: 67 aceptadas, 11 en revisión, desacuerdo 15 %, 8 min |
 | Redacción restringida (paso 4) | Hecho: edición armada por impacto, redactor + verificador en código + verificador de fidelidad en otro modelo, hasta dos reparaciones, traducción ES/EN verificada (D44–D50) |
-| Posición de medios por anotadores modelo (paso 5) | Pendiente |
+| Posición de medios por anotadores modelo (paso 5) | Hecho, con compuerta de acuerdo (D56–D59); primera prueba real bloqueada por desacuerdo entre los dos modelos de Kimi |
 | Nivel de autonomía en la metodología pública | Hecho |
 | Revisor local multidisciplinar (sustituye al revisor adversarial) | Diseñado: `docs/revisor-local.md`, sin implementar |
 | Literatura académica, página de transparencia | Pendiente |

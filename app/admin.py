@@ -237,6 +237,77 @@ def edit_sentence(sent_id: int, background: BackgroundTasks, texto: str = Form(.
     return _back(f"/admin/edicao/{ed_id}", "Oração editada. Sem chave de modelo: traduza no bloco Traduções.")
 
 
+@router.get("/posicoes", response_class=HTMLResponse)
+def positions_page(request: Request, user: str = Depends(editor)):
+    from .agents.positions import POSITION_VERSION, editor_agreement, editor_sample
+    from .analytics.core import positions_in_force
+    with session() as s:
+        country = get_settings().country_code
+        axis = s.scalars(select(m.Cleavage).where(m.Cleavage.country_id == country, m.Cleavage.tipo == "principal",
+                                                  m.Cleavage.activo.is_(True))).first()
+        poles = sorted(axis.poles, key=lambda p: p.orden)
+        from datetime import datetime, timezone
+        pos = positions_in_force(s, axis.id, datetime.now(timezone.utc))
+        rows = []
+        for oid, p in sorted(pos.items(), key=lambda kv: kv[1].score):
+            o = s.get(m.Outlet, oid)
+            if o.es_ficticio:
+                continue
+            side = poles[0].etiqueta if p.ic_superior < 0 else poles[1].etiqueta if p.ic_inferior > 0 else "sem polo (intervalo cruza zero)"
+            rows.append({"o": o, "p": p, "side": side})
+        coders = sorted(set(s.scalars(select(m.PositionAnnotation.codificador).where(
+            m.PositionAnnotation.cleavage_id == axis.id, m.PositionAnnotation.codificador.like("modelo:%")))))
+        agreement = editor_agreement(s, axis.id, coders) if coders else None
+        sample = editor_sample(s, axis.id, user, n=20)
+        last_run = s.scalars(select(m.AgentRun).where(m.AgentRun.tipo == "posiciones").order_by(m.AgentRun.id.desc())).first()
+        return page("positions.html", user, axis=axis, poles=poles, rows=rows, agreement=agreement, sample=sample,
+                    last_run=last_run, prompt=POSITION_VERSION, msg=request.query_params.get("msg"))
+
+
+@router.post("/posicoes/codificar")
+async def positions_code(request: Request, user: str = Depends(editor)):
+    """The editor's blind codes. Field names: v_<article_id> = -2..2 or 'na'."""
+    form = await request.form()
+    check_csrf(user, form.get("csrf", ""))
+    with session() as s:
+        axis_id = int(form.get("axis_id"))
+        ev_of = {}
+        n = 0
+        for k, v in form.items():
+            if not k.startswith("v_") or v == "":
+                continue
+            aid = int(k[2:])
+            val = None if v == "na" else int(v)
+            if val is not None and not -2 <= val <= 2:
+                continue
+            if aid not in ev_of:
+                ev_of[aid] = s.scalars(select(m.PositionAnnotation.event_id).where(
+                    m.PositionAnnotation.article_id == aid, m.PositionAnnotation.cleavage_id == axis_id)).first()
+            exists = s.scalars(select(m.PositionAnnotation).where(
+                m.PositionAnnotation.article_id == aid, m.PositionAnnotation.cleavage_id == axis_id,
+                m.PositionAnnotation.codificador == f"editor:{user}")).first()
+            if exists is None:
+                s.add(m.PositionAnnotation(article_id=aid, event_id=ev_of[aid], cleavage_id=axis_id,
+                                           codificador=f"editor:{user}", prompt_version="editor", valor=val))
+                n += 1
+        return _back("/admin/posicoes", f"{n} textos codificados.")
+
+
+def _positions_job(user: str) -> None:
+    from .agents.positions import estimate_positions
+    with session() as s:
+        estimate_positions(s, get_settings().country_code, disparado_por=f"editor:{user}", force=True)
+
+
+@router.post("/posicoes/estimar")
+def positions_estimate(background: BackgroundTasks, csrf: str = Form(...), user: str = Depends(editor)):
+    check_csrf(user, csrf)
+    if not get_settings().agent_api_key:
+        return _back("/admin/posicoes", "Sem chave de modelo configurada.")
+    background.add_task(_positions_job, user)
+    return _back("/admin/posicoes", "Estimativa iniciada (alguns minutos); ver Corridas dos agentes.")
+
+
 @router.post("/artigo/reatribuir")
 def reassign_article(ed_id: int = Form(...), article_id: int = Form(...), from_event: int = Form(...),
                      to_event: int = Form(...), csrf: str = Form(...), user: str = Depends(editor)):

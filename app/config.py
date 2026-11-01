@@ -93,6 +93,8 @@ class Settings:
     agent_budget_cents_per_run: int = field(default_factory=lambda: _int("AGENT_BUDGET_CENTS_PER_RUN", 100))
     # Drafting makes ~5 calls per event (draft, faithfulness check, repairs, two translations).
     agent_budget_cents_draft: int = field(default_factory=lambda: _int("AGENT_BUDGET_CENTS_DRAFT", 300))
+    # Positions: ~80 annotation calls the first time; later runs only code new texts (D56).
+    agent_budget_cents_positions: int = field(default_factory=lambda: _int("AGENT_BUDGET_CENTS_POSITIONS", 300))
     agent_price_in_cents_per_mtok: int = field(default_factory=lambda: _int("AGENT_PRICE_IN_CENTS_PER_MTOK",
                                                                             _int("CHAT_PRICE_IN_CENTS_PER_MTOK", 300)))
     agent_price_out_cents_per_mtok: int = field(default_factory=lambda: _int("AGENT_PRICE_OUT_CENTS_PER_MTOK",

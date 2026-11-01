@@ -147,8 +147,12 @@ etapas:
       en: "Estimate each outlet's position per axis with a confidence interval, by two annotator agents with an agreement measure. Without it, no outlet has a pole."
     principio: {es: "El sesgo es una estimación, nunca una etiqueta a mano.", en: "Bias is an estimate, never a hand label."}
     fallos:
-      - es: "Mientras no exista, toda afirmación entra atribuida y no hay banderas de punto ciego en ediciones reales (D39)."
-        en: "Until it exists, every claim is attributed and real editions have no blind-spot flags (D39)."
+      - es: "Cero es la media de los medios monitoreados en el mismo evento, no un punto neutro absoluto (D57): si todos se inclinan hacia un lado, la escala no lo ve."
+        en: "Zero is the average of the monitored outlets on the same event, not an absolute neutral point (D57): if all lean one way, the scale does not see it."
+      - es: "Los dos anotadores son modelos del mismo proveedor: su acuerdo mide consistencia, no validez. La validez la mide la muestra mensual del editor."
+        en: "Both annotators are models from the same provider: their agreement measures consistency, not validity. The editor's monthly sample measures validity."
+      - es: "El tope de ±2 comprime a los medios más extremos hacia el centro (simulación: +0,9 se estima +0,74)."
+        en: "The ±2 ceiling compresses the most extreme outlets towards the centre (simulation: +0.9 is estimated at +0.74)."
   seleccion:
     proposito:
       es: "Decide si cada afirmación aceptada entra como hecho llano, atribuida o excluida."
@@ -286,7 +290,9 @@ agentes:
   traductor:
     tarea: {es: "Traducir título, oraciones y afirmaciones al español y al inglés en registro de agencia, sin tocar los claim_ids.", en: "Translate title, sentences and claims into Spanish and English in agency register, without touching claim_ids."}
   anotador_posicion:
-    tarea: {es: "Dos agentes independientes codifican la posición de cada medio; se mide su acuerdo (alfa de Krippendorff) y el editor codifica una muestra mensual.", en: "Two independent agents code each outlet's position; their agreement is measured (Krippendorff's alpha) and the editor codes a monthly sample."}
+    tarea: {es: "Codificar de −2 a +2 (o no aplica) cómo cada titular y resumen enmarca a los dos campos del eje principal, sin saber de qué medio es.", en: "Code from −2 to +2 (or not applicable) how each headline and summary frames the two camps of the principal axis, without knowing the outlet."}
+  anotador_posicion_b:
+    tarea: {es: "La misma codificación, de forma independiente y con otro modelo; el acuerdo entre ambos decide si se publican posiciones.", en: "The same coding, independently and with another model; their agreement decides whether positions are published."}
   revisor_adversarial:
     tarea: {es: "Revisar cada crónica con lentes disciplinarias (jurídica, económica, lingüística…) citando solo afirmaciones o la base de conocimiento local fechada; diseño en docs/revisor-local.md.", en: "Review each chronicle through disciplinary lenses (legal, economic, linguistic…) citing only claims or the dated local knowledge base; design in docs/revisor-local.md."}
   agente_literatura:
@@ -306,6 +312,7 @@ compuertas:
   cifras_en_disputa: {regla: {es: "Misma medida con valores distintos: siempre atribuida, y la oración debe dar cada valor con su fuente.", en: "Same measure with different values: always attributed, and the sentence must give each value with its source."}, al_fallar: {es: "Oración rechazada (cifra_colapsada, cifra_sin_fuente).", en: "Sentence rejected (cifra_colapsada, cifra_sin_fuente)."}}
   verificador_oraciones: {regla: {es: "Rechaza oraciones sin claim_id; con claim inexistente, de otro evento, excluido o no aceptado; que citan una afirmación atribuida sin verbo de habla; con un número que no está en las afirmaciones citadas (2,3 bilhões = 2.300 millones); con fórmula de certeza o verbo desaconsejado ('alegou').", en: "Rejects sentences without a claim_id; with a missing, foreign, excluded or unaccepted claim; citing an attributed claim without a speech verb; with a number absent from the cited claims (2.3 billion = 2,300 million); with a certainty formula or discouraged verb ('alegou')."}, al_fallar: {es: "La crónica queda en estado \"rechazada\" y la edición no puede aprobarse. Los motivos por oración e idioma se ven en /admin/edicao/{id} y en python -m app.cli status.", en: "The chronicle ends in state \"rechazada\" and the edition cannot be approved. Per-sentence, per-language reasons are shown at /admin/edicao/{id} and by python -m app.cli status."}}
   terminos_cargados: {regla: {es: "Un término de la lista solo puede aparecer atribuido o entre comillas; algunos, solo entre comillas.", en: "A listed term may appear only attributed or in quotes; some only in quotes."}, al_fallar: {es: "Oración rechazada (termino_cargado).", en: "Sentence rejected (termino_cargado)."}}
+  acuerdo_anotadores: {regla: {es: "Las posiciones se publican solo si el alfa de Krippendorff entre los dos modelos es ≥ 0,667 y, con 20 o más textos del editor, también el alfa editor–modelos.", en: "Positions are published only if Krippendorff's alpha between the two models is ≥ 0.667 and, with 20 or more editor texts, also the editor–model alpha."}, al_fallar: {es: "No se escriben posiciones nuevas; la cola explica por qué (posicoes_nao_publicadas).", en: "No new positions are written; the queue explains why (posicoes_nao_publicadas)."}}
   regla_literal: {regla: {es: "Una objeción del verificador de fidelidad se anula si todas las palabras de contenido de la oración vienen de sus afirmaciones (y en el mismo orden si cita una sola); nunca anula negaciones, inversión de roles ni actores añadidos.", en: "A faithfulness objection is overridden if every content word of the sentence comes from its claims (in the same order if it cites one); it never overrides negation, role reversal or added actors."}, al_fallar: {es: "La anulación queda en la cola (veredito_anulado) para el editor.", en: "The override is queued (veredito_anulado) for the editor."}}
   umbral_punto_ciego: {regla: {es: "Bandera si la diferencia de cobertura entre polos es ≥ 40 puntos en un evento de impacto ≥ 60, solo en el eje principal.", en: "Flag if the coverage gap between poles is ≥ 40 points in an event with impact ≥ 60, on the principal axis only."}, al_fallar: {es: "No aplica: decide si se levanta la bandera.", en: "Not applicable: it decides whether a flag is raised."}}
   alerta_ingesta: {regla: {es: "Si los medios activos de un polo caen por debajo del 60% de la edición anterior, se registra una alerta: puede ser falla técnica, no punto ciego.", en: "If a pole's active outlets drop below 60% of the previous edition, an alert is logged: it may be a technical failure, not a blind spot."}, al_fallar: {es: "Error en el registro del pipeline; no bloquea.", en: "Error in the pipeline log; does not block."}}
@@ -344,6 +351,15 @@ cola:
     significa: {es: "El verificador no respondió: ninguna afirmación del evento se aceptó.", en: "The checker did not answer: no claim from the event was accepted."}
     resolver: {es: "Volver a correr extract con --refazer para esa semana, o revisar las afirmaciones una por una.", en: "Rerun extract with --refazer for that week, or review the claims one by one."}
 
+  posicoes_nao_publicadas:
+    significa: {es: "El acuerdo entre los dos modelos (alfa de Krippendorff) quedó por debajo de 0,667, o el editor discrepa de los modelos, o se alcanzó el tope de gasto. Siguen vigentes las posiciones anteriores.", en: "Agreement between the two models (Krippendorff's alpha) fell below 0.667, or the editor disagrees with the models, or the spending cap was hit. Previous positions stay in force."}
+    resolver: {es: "Ver la corrida en Corridas; si el desacuerdo persiste, revisar el prompt de anotación (position-1) antes de estimar de nuevo.", en: "Open the run in Runs; if disagreement persists, review the annotation prompt (position-1) before estimating again."}
+  posicoes_sem_estimativa:
+    significa: {es: "Un medio no reunió 15 textos codificados en eventos con al menos tres medios.", en: "An outlet did not gather 15 coded texts in events with at least three outlets."}
+    resolver: {es: "Nada urgente: queda sin polo y fuera de los denominadores. Revisar su fuente si el volumen es bajo.", en: "Nothing urgent: it stays without a pole and out of the denominators. Check its feed if volume is low."}
+  validacao_editor_pendente:
+    significa: {es: "Las posiciones se publicaron provisionales sin la muestra ciega del editor.", en: "Positions were published as provisional without the editor's blind sample."}
+    resolver: {es: "Codificar los 20 textos de la amostra cega en Posições dos veículos.", en: "Code the 20 texts of the blind sample in Posições dos veículos."}
   edicao_curta:
     significa: {es: "Menos de seis eventos de la semana tienen al menos tres afirmaciones aceptadas.", en: "Fewer than six of the week's events have at least three accepted claims."}
     resolver: {es: "Revisar en la Fila las afirmaciones en revisión de eventos casi completos, o aceptar una edición corta (la compuerta de publicación bloquea hasta seis).", en: "Review pending claims of nearly complete events in the queue, or accept a short edition (the publication gate blocks below six)."}
@@ -681,6 +697,8 @@ nombres:
   verificador_fidelidad: {es: "Verificador de fidelidad", en: "Faithfulness checker"}
   traductor: {es: "Traductor", en: "Translator"}
   regla_literal: {es: "Regla literal (D47)", en: "Literal rule (D47)"}
+  acuerdo_anotadores: {es: "Acuerdo entre anotadores", en: "Annotator agreement"}
+  anotador_posicion_b: {es: "Segundo anotador de posición", en: "Second position annotator"}
   agente_literatura: {es: "Agente de literatura", en: "Literature agent"}
   agente_arranque_pais: {es: "Agente de arranque de país", en: "Country bootstrap agent"}
   robots_ritmo: {es: "robots.txt y ritmo", en: "robots.txt and rate"}
@@ -693,7 +711,6 @@ nombres:
   cifras_en_disputa: {es: "Cifras en disputa", en: "Disputed figures"}
   verificador_oraciones: {es: "Verificador de oraciones", en: "Sentence verifier"}
   terminos_cargados: {es: "Términos cargados", en: "Loaded terms"}
-  regla_literal: {regla: {es: "Una objeción del verificador de fidelidad se anula si todas las palabras de contenido de la oración vienen de sus afirmaciones (y en el mismo orden si cita una sola); nunca anula negaciones, inversión de roles ni actores añadidos.", en: "A faithfulness objection is overridden if every content word of the sentence comes from its claims (in the same order if it cites one); it never overrides negation, role reversal or added actors."}, al_fallar: {es: "La anulación queda en la cola (veredito_anulado) para el editor.", en: "The override is queued (veredito_anulado) for the editor."}}
   umbral_punto_ciego: {es: "Umbral de punto ciego", en: "Blind-spot threshold"}
   alerta_ingesta: {es: "Alerta de ingesta por polo", en: "Per-pole ingestion alert"}
   verificador_visual: {es: "Verificador visual", en: "Visual verifier"}

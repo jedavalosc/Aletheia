@@ -33,6 +33,10 @@ def main(argv=None):
     ex.add_argument("--max-eventos", type=int, default=15)
     ex.add_argument("--refazer", action="store_true", help="Refaz eventos já processados (sem decisões do editor)")
     ex.add_argument("--disparado-por", default="cli")
+    po = sub.add_parser("positions", help="Passo 5: estima a posição dos veículos no eixo principal (dois modelos)")
+    po.add_argument("--semana", default=None, help="Segunda-feira da semana-alvo (AAAA-MM-DD); padrão: semana atual")
+    po.add_argument("--forcar", action="store_true", help="Estima mesmo com estimativa vigente há menos de 28 dias")
+    po.add_argument("--disparado-por", default="cli")
     dr = sub.add_parser("draft", help="Passo 4: monta a edição da semana e redige as crônicas (PT, ES, EN)")
     dr.add_argument("--semana", default=None, help="Segunda-feira da semana (AAAA-MM-DD); padrão: semana atual")
     dr.add_argument("--eventos", type=int, nargs="*", default=None, help="Só estes eventos (ids)")
@@ -90,6 +94,13 @@ def main(argv=None):
         with session() as s:
             wk = date.fromisoformat(a.semana) if a.semana else None
             print(json.dumps(extract_week(s, get_settings().country_code, wk, a.max_eventos, a.refazer, a.disparado_por),
+                             ensure_ascii=False, default=str))
+    elif a.cmd == "positions":
+        from datetime import date
+        from .agents.positions import estimate_positions
+        with session() as s:
+            wk = date.fromisoformat(a.semana) if a.semana else None
+            print(json.dumps(estimate_positions(s, get_settings().country_code, wk, a.disparado_por, a.forcar),
                              ensure_ascii=False, default=str))
     elif a.cmd == "draft":
         from datetime import date

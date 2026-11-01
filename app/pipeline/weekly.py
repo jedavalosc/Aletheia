@@ -12,7 +12,8 @@ Stages:  ingest -> normalise/dedupe -> embed+entities -> cluster (7-day window)
 Implemented: collection (step 1), grouping into candidate events (step 2),
 the stages that run on loaded events (selection, coverage, blind spots,
 framing, verifier, standard visuals), claim extraction with cross-check (step 3),
-edition assembly and constrained drafting in three languages (step 4). See docs/agentes.md.
+edition assembly and constrained drafting in three languages (step 4), outlet positions (step 5).
+See docs/agentes.md.
 """
 from __future__ import annotations
 
@@ -86,6 +87,13 @@ def group(window: dict) -> dict:
         return cluster_week(s, get_settings().country_code, window["semana_inicio"].date(), disparado_por="pipeline")
 
 
+def positions(window: dict) -> dict:
+    """Step 5: outlet positions (two model annotators + agreement gate), renewed every 28 days."""
+    from ..agents.positions import estimate_positions
+    with session() as s:
+        return estimate_positions(s, get_settings().country_code, window["semana_inicio"].date(), disparado_por="pipeline")
+
+
 def extract(window: dict) -> dict:
     """Step 3: atomic claims with an independent cross-check (agent + checker + gates)."""
     from ..agents.extract import extract_week
@@ -127,6 +135,7 @@ def run(force: bool = False, now: datetime | None = None) -> int:
             ed = ensure_edition(s, country, win)
     log.info("Recoleção: %s", ingest(win))
     log.info("Agrupamento: %s", group(win))
+    log.info("Posições: %s", positions(win))
     log.info("Afirmações: %s", extract(win))
     log.info("Redação: %s", draft(win))
     with session() as s:

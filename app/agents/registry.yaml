@@ -13,7 +13,7 @@
 # ejecutor: agente (llama a un modelo) | determinista (solo código) | humano (editor en /admin)
 
 version: 1
-actualizado: "2026-10-14"  # al commit 3aa398e (paso 4)
+actualizado: "2026-11-01"  # paso 5
 repositorio: https://github.com/jedavalosc/aletheia
 
 etapas:
@@ -110,9 +110,21 @@ etapas:
 
   - id: posicion_medios
     paso_agentico: 5
-    estado: especificado_no_implementado
+    estado: implementado
     ejecutor: agente
-    agentes: [anotador_posicion]
+    run_tipo: posiciones
+    pasos_registrados: [territorial, muestra, compuerta_acuerdo, estimacion]
+    agentes: [anotador_posicion, anotador_posicion_b]
+    codigo: [app/agents/positions.py::estimate_positions, app/agents/positions.py::sample_articles, app/agents/positions.py::annotate, app/rules/positions.py::estimate, app/agents/positions.py::territorial_positions]
+    cli: python -m app.cli positions
+    programacion: [app/pipeline/weekly.py::positions]
+    pantalla: /admin/posicoes
+    compuertas: [acuerdo_anotadores, tope_gasto]
+    cola: [posicoes_nao_publicadas, posicoes_sem_estimativa, validacao_editor_pendente]
+    pruebas:
+      - tests/test_positions.py::test_alpha_matches_known_cases
+      - tests/test_positions.py::test_estimate_recovers_order_and_removes_agenda_effects
+      - tests/test_positions.py::test_positions_end_to_end_gate_then_publish
     spec: ["encargo §2 principio 3", "encargo §14 (dos anotadores)", docs/agentes.md]
     sigue_a: [recoleccion]
     pos: [1, 1]
@@ -362,8 +374,24 @@ agentes:
 
   - id: anotador_posicion
     etapa: posicion_medios
-    estado: especificado_no_implementado
-    spec: ["encargo §14 (dos anotadores + acuerdo)", docs/agentes.md]
+    estado: implementado
+    rol_modelo: agent
+    prompt: app/agents/positions.py::SYSTEM
+    prompt_version: app/agents/positions.py::POSITION_VERSION
+    llamada: app/agents/positions.py::annotate
+    compuertas: [acuerdo_anotadores, tope_gasto]
+    cola: [posicoes_nao_publicadas]
+
+  - id: anotador_posicion_b
+    etapa: posicion_medios
+    estado: implementado
+    rol_modelo: verifier
+    prompt: app/agents/positions.py::SYSTEM
+    prompt_version: app/agents/positions.py::POSITION_VERSION
+    llamada: app/agents/positions.py::annotate
+    verifica_a: anotador_posicion
+    compuertas: [acuerdo_anotadores, tope_gasto]
+    cola: [posicoes_nao_publicadas]
 
   - id: revisor_adversarial
     etapa: revision_adversarial
@@ -411,6 +439,9 @@ compuertas:
   - id: verificador_oraciones
     codigo: [app/rules/verifier.py::verify_sentence, app/rules/verifier.py::verify_brief, app/rules/verifier.py::number_supported, app/editorial.py::verify_brief_all_languages, app/agents/draft.py::code_issues]
     pruebas: [tests/test_rules.py::test_sentence_without_claim_rejected, tests/test_rules.py::test_nonexistent_and_foreign_claims_rejected, tests/test_draft.py::test_code_issues_catch_numbers_attribution_unaccepted_and_title_form, tests/test_draft.py::test_discouraged_verbs_outside_quotes]
+  - id: acuerdo_anotadores
+    codigo: [app/rules/positions.py::krippendorff_alpha_interval, app/agents/positions.py::estimate_positions, app/agents/positions.py::editor_agreement]
+    pruebas: [tests/test_positions.py::test_alpha_matches_known_cases, tests/test_positions.py::test_positions_end_to_end_gate_then_publish]
   - id: regla_literal
     codigo: [app/agents/draft.py::literal_to_claims, app/agents/draft.py::faithful_issues]
     pruebas: [tests/test_draft.py::test_literal_sentence_overrules_checker_but_not_changes_of_meaning, tests/test_draft.py::test_last_checker_verdict_wins]

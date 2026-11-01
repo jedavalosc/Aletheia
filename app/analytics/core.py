@@ -35,7 +35,7 @@ def positions_in_force(s: Session, cleavage_id: int, at: datetime) -> dict[int, 
     rows = s.scalars(select(m.OutletPosition).where(
         m.OutletPosition.cleavage_id == cleavage_id,
         m.OutletPosition.vigente_desde <= at.date(),
-    ).order_by(m.OutletPosition.vigente_desde)).all()
+    ).order_by(m.OutletPosition.vigente_desde, m.OutletPosition.id)).all()
     out: dict[int, m.OutletPosition] = {}
     for r in rows:
         if r.vigente_hasta is None or r.vigente_hasta >= at.date():
